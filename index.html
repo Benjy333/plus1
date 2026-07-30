@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Plus 1 — Prototype</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --paper:#F7F7F5;
+  --ink:#1F2024;
+  --ink-soft:#8B8D97;
+  --rose:#FA3E52;
+  --rose-soft:#FFE9EB;
+  --border:#ECEBE7;
+  --white:#FFFFFF;
+  --green:#2F6B4F;
+  --green-soft:#E4EFE9;
+  --lock:#C7C6C2;
+  --shadow: 0 10px 30px rgba(31,32,36,0.07), 0 2px 8px rgba(31,32,36,0.04);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background:var(--paper);
+  font-family:'Manrope',sans-serif;
+  color:var(--ink);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:40px 20px;
+}
+.stage-label{
+  position:fixed;
+  top:24px;
+  left:50%;
+  transform:translateX(-50%);
+  font-weight:700;
+  font-size:12.5px;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+}
+.phone{
+  width:380px;
+  height:800px;
+  background:var(--white);
+  border-radius:48px;
+  overflow:hidden;
+  position:relative;
+  box-shadow:0 50px 100px rgba(31,32,36,0.20), 0 0 0 10px var(--ink);
+}
+.notch{
+  position:absolute;
+  top:0; left:50%;
+  transform:translateX(-50%);
+  width:120px; height:24px;
+  background:var(--ink);
+  border-radius:0 0 18px 18px;
+  z-index:50;
+}
+.app{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  padding-top:36px;
+  background:var(--paper);
+}
+.topbar{
+  padding:18px 24px 12px;
+  flex-shrink:0;
+  background:var(--paper);
+}
+.wordmark{
+  font-weight:800;
+  font-size:22px;
+  letter-spacing:-0.02em;
+}
+.wordmark span{color:var(--rose);}
+.screen{
+  flex:1;
+  overflow-y:auto;
+  padding:8px 22px 90px;
+  display:none;
+}
+.screen.active{display:block;}
+
+/* ---- TODAY ---- */
+.match-eyebrow{
+  font-size:12.5px;
+  font-weight:700;
+  color:var(--ink-soft);
+  letter-spacing:0.04em;
+  margin:10px 2px 14px;
+}
+.card{
+  background:var(--white);
+  border-radius:28px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.photo-block{
+  height:280px;
+  position:relative;
+  display:flex;
+  align-items:flex-end;
+  padding:22px;
+}
+.photo-block::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%);
+}
+.photo-initial{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-58%);
+  font-weight:800;
+  font-size:76px;
+  color:rgba(255,255,255,0.55);
+}
+.photo-text{position:relative; z-index:2; color:var(--white);}
+.photo-name{font-weight:800; font-size:25px;}
+.photo-tagline{font-size:13.5px; font-weight:500; opacity:0.92; margin-top:2px;}
+.card-body{padding:20px 22px 22px;}
+.info-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:11px 0;
+  border-bottom:1px solid var(--border);
+  font-size:13.5px;
+}
+.info-row:last-of-type{border-bottom:none;}
+.info-row span:first-child{color:var(--ink-soft); font-weight:500;}
+.info-row span:last-child{font-weight:700;}
+.actions{display:flex; gap:10px; margin-top:18px;}
+.btn{
+  flex:1;
+  padding:15px;
+  border-radius:999px;
+  font-weight:700;
+  font-size:14.5px;
+  cursor:pointer;
+  text-align:center;
+  border:none;
+  transition:transform .12s ease, opacity .12s ease;
+}
+.btn:active{transform:scale(0.96);}
+.btn-ghost{background:var(--paper); color:var(--ink);}
+.btn-fill{background:var(--rose); color:var(--white); box-shadow:0 8px 20px rgba(250,62,82,0.35);}
+.empty-today{
+  margin-top:90px;
+  text-align:center;
+  color:var(--ink-soft);
+}
+.empty-today .icon-plus{
+  width:64px;height:64px;
+  border-radius:50%;
+  background:var(--white);
+  box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 20px;
+  font-weight:800;
+  font-size:22px;
+  color:var(--rose);
+}
+.empty-today .big{
+  font-weight:800;
+  font-size:18px;
+  color:var(--ink);
+  margin-bottom:6px;
+}
+.empty-today .small{font-size:13.5px;}
+
+/* ---- CONVERSATIONS ---- */
+.section-label{
+  font-size:12.5px;
+  font-weight:700;
+  letter-spacing:0.04em;
+  color:var(--ink-soft);
+  margin:10px 2px 12px;
+}
+.convo-card{
+  display:flex;
+  gap:13px;
+  align-items:center;
+  background:var(--white);
+  border-radius:20px;
+  padding:13px 14px;
+  margin-bottom:10px;
+  box-shadow:var(--shadow);
+  cursor:pointer;
+}
+.avatar-sm{
+  width:54px; height:54px;
+  border-radius:50%;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:800;
+  font-size:18px;
+  color:var(--white);
+}
+.convo-info{flex:1; min-width:0;}
+.convo-name{font-weight:700; font-size:15px;}
+.convo-preview{
+  font-size:12.5px;
+  color:var(--ink-soft);
+  margin-top:2px;
+  font-weight:500;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.progress-track{
+  height:4px;
+  border-radius:2px;
+  background:var(--border);
+  margin-top:8px;
+  overflow:hidden;
+}
+.progress-fill{height:100%; background:var(--rose); border-radius:2px;}
+
+/* ---- BOTTOM NAV ---- */
+.bottomnav{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  background:var(--white);
+  display:flex;
+  padding:12px 20px 22px;
+  box-shadow:0 -6px 18px rgba(31,32,36,0.06);
+  z-index:40;
+}
+.nav-item{
+  flex:1;
+  text-align:center;
+  cursor:pointer;
+  color:var(--ink-soft);
+}
+.nav-item.active{color:var(--rose);}
+.nav-icon{font-size:19px; margin-bottom:3px;}
+.nav-text{font-size:11px; font-weight:700;}
+.nav-badge{
+  display:inline-block;
+  background:var(--rose);
+  color:var(--white);
+  font-size:9.5px;
+  font-weight:800;
+  padding:1px 5px;
+  border-radius:10px;
+  margin-left:3px;
+  vertical-align:top;
+}
+
+/* ---- CHAT ---- */
+.chat-header{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:14px 22px;
+  background:var(--white);
+  flex-shrink:0;
+  box-shadow:0 4px 14px rgba(31,32,36,0.05);
+}
+.back-btn{
+  font-size:18px; cursor:pointer; color:var(--ink);
+  width:30px; height:30px;
+  display:flex;align-items:center;justify-content:center;
+}
+.chat-name{font-weight:700; font-size:15px;}
+.chat-sub{font-size:11.5px; color:var(--ink-soft); font-weight:500;}
+.view-profile{
+  margin-left:auto;
+  font-size:12px;
+  font-weight:700;
+  color:var(--rose);
+  cursor:pointer;
+  white-space:nowrap;
+  background:var(--rose-soft);
+  padding:8px 13px;
+  border-radius:999px;
+}
+.messages{
+  flex:1;
+  overflow-y:auto;
+  padding:18px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+  background:var(--paper);
+}
+.bubble{
+  max-width:75%;
+  padding:11px 15px;
+  border-radius:20px;
+  font-size:13.5px;
+  line-height:1.42;
+  font-weight:500;
+}
+.bubble.them{
+  background:var(--white);
+  align-self:flex-start;
+  border-bottom-left-radius:6px;
+  box-shadow:0 2px 8px rgba(31,32,36,0.04);
+}
+.bubble.me{
+  background:var(--rose);
+  color:var(--white);
+  align-self:flex-end;
+  border-bottom-right-radius:6px;
+}
+.toast{
+  align-self:center;
+  background:var(--green-soft);
+  color:var(--green);
+  font-size:11.5px;
+  font-weight:700;
+  padding:7px 14px;
+  border-radius:20px;
+  margin:4px 0;
+}
+.chat-input-row{
+  display:flex;
+  gap:8px;
+  padding:14px 18px 20px;
+  background:var(--white);
+  flex-shrink:0;
+}
+.chat-input{
+  flex:1;
+  border:none;
+  background:var(--paper);
+  border-radius:999px;
+  padding:13px 18px;
+  font-size:13.5px;
+  font-family:'Manrope',sans-serif;
+  font-weight:500;
+  outline:none;
+}
+.send-btn{
+  width:44px; height:44px;
+  border-radius:50%;
+  background:var(--rose);
+  color:var(--white);
+  border:none;
+  cursor:pointer;
+  font-size:16px;
+  flex-shrink:0;
+  box-shadow:0 6px 16px rgba(250,62,82,0.35);
+}
+.send-btn:active{transform:scale(0.94);}
+
+/* ---- PROFILE DRAWER ---- */
+.overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(31,32,36,0.4);
+  z-index:80;
+  display:none;
+}
+.overlay.active{display:block;}
+.drawer{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  background:var(--white);
+  border-radius:28px 28px 0 0;
+  z-index:90;
+  max-height:82%;
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.2,.8,.2,1);
+  display:flex;
+  flex-direction:column;
+}
+.drawer.active{transform:translateY(0);}
+.drawer-handle{
+  width:38px; height:4px;
+  background:var(--border);
+  border-radius:2px;
+  margin:12px auto 4px;
+}
+.drawer-body{overflow-y:auto; padding:8px 24px 30px;}
+.drawer-head{display:flex; align-items:center; gap:13px; padding:10px 0 18px;}
+.pf-block{padding:15px 0; border-bottom:1px solid var(--border);}
+.pf-block:last-child{border-bottom:none;}
+.pf-block.locked{opacity:0.5;}
+.pf-title{
+  font-size:11.5px;
+  font-weight:700;
+  letter-spacing:0.05em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  margin-bottom:6px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.pf-text{font-size:13.5px; line-height:1.5; font-weight:500;}
+.tags{display:flex; flex-wrap:wrap; gap:7px; margin-top:2px;}
+.tag{
+  background:var(--rose-soft);
+  color:var(--rose);
+  font-size:12px;
+  font-weight:700;
+  padding:6px 12px;
+  border-radius:999px;
+}
+.lock-note{font-size:12px; color:var(--lock); font-weight:600;}
+
+/* ---- SWAP MODAL ---- */
+.modal{
+  position:absolute;
+  inset:0;
+  background:rgba(31,32,36,0.45);
+  z-index:100;
+  display:none;
+  align-items:flex-end;
+}
+.modal.active{display:flex;}
+.modal-card{
+  background:var(--white);
+  width:100%;
+  border-radius:28px 28px 0 0;
+  padding:24px 24px 30px;
+}
+.modal-title{font-weight:800; font-size:17px; margin-bottom:5px;}
+.modal-sub{font-size:13px; color:var(--ink-soft); margin-bottom:18px; font-weight:500;}
+.swap-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:11px 0;
+  border-bottom:1px solid var(--border);
+}
+.swap-row:last-of-type{border-bottom:none;}
+.swap-info{flex:1;}
+.swap-name{font-weight:700; font-size:14px;}
+.swap-let-go{
+  font-size:12px;
+  font-weight:700;
+  color:var(--rose);
+  background:var(--rose-soft);
+  padding:9px 14px;
+  border-radius:999px;
+  cursor:pointer;
+}
+.modal-cancel{
+  text-align:center;
+  margin-top:18px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--ink-soft);
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="stage-label">Plus 1 — clickable prototype</div>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="wordmark">Plus<span>+1</span></div>
+    </div>
+
+    <!-- TODAY -->
+    <div class="screen active" id="screen-today"></div>
+
+    <!-- CONVERSATIONS -->
+    <div class="screen" id="screen-convos"></div>
+
+    <!-- CHAT -->
+    <div class="screen" id="screen-chat" style="display:none; flex-direction:column; padding:0;"></div>
+
+    <div class="bottomnav" id="bottomnav">
+      <div class="nav-item active" data-tab="today" onclick="switchTab('today')">
+        <div class="nav-icon">&#10022;</div>
+        <div class="nav-text">Today</div>
+      </div>
+      <div class="nav-item" data-tab="convos" onclick="switchTab('convos')">
+        <div class="nav-icon">&#128172;</div>
+        <div class="nav-text">Chats <span class="nav-badge" id="convoCount">3</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="profileDrawer"></div>
+
+  <div class="modal" id="swapModal"></div>
+</div>
+
+<script>
+const PALETTE = ['#C97B63','#4E6E58','#7B6B9E','#C2673F','#3E6E8E','#A8515C'];
+function colorFor(name){
+  let h=0; for(const c of name) h = (h*31 + c.charCodeAt(0)) % PALETTE.length;
+  return PALETTE[h];
+}
+function initials(name){ return name[0].toUpperCase(); }
+
+const THRESHOLDS = [0,3,6,10]; // stage 0..3
+function stageFor(count){
+  let s=0;
+  for(let i=1;i<THRESHOLDS.length;i++) if(count>=THRESHOLDS[i]) s=i;
+  return s;
+}
+
+let people = {
+  jordan:{ name:'Jordan', age:29, tagline:'Photographer, based in New Farm', bio:'Shoots weddings by day, film photography on weekends. Always got a coffee in hand.', job:'Freelance Photographer', interests:['Film photography','Hiking','Vinyl'], lookingFor:'Something that starts slow and means it.' },
+  mia:{ name:'Mia', age:27, tagline:'Landscape architect, dog mum', bio:'Designing parks by day, getting dragged around them by my dog by night. Big on plants and bad puns.', job:'Landscape Architect', interests:['Gardening','Trail running','Ceramics'], lookingFor:'Someone who won\u2019t mind a dog-shaped third wheel.' },
+  sam:{ name:'Sam', age:31, tagline:'Runs a small coffee roastery', bio:'Left corporate law to roast coffee. Zero regrets. Ask me about the espresso machine I\u2019m rebuilding.', job:'Coffee Roaster & Owner', interests:['Coffee','Woodworking','Jazz'], lookingFor:'Someone up for slow Sunday mornings.' },
+  alex:{ name:'Alex', age:25, tagline:'Junior doctor, night-shift survivor', bio:'Emergency med registrar. Can fix you up and then completely fail to cook dinner.', job:'Junior Doctor', interests:['Rock climbing','True crime podcasts','Cooking (badly)'], lookingFor:'Patience with my 3am texts.' },
+};
+
+let convos = [
+  {id:'mia', messageCount:4, messages:[
+    {who:'them', text:'Hey! Loved your profile, that hiking photo is stunning.'},
+    {who:'me', text:'Ha thanks — that was in the Scenic Rim, brutal climb.'},
+    {who:'them', text:'Worth it though right? What do you do for work?'},
+    {who:'me', text:'Landscape architecture. You?'},
+  ]},
+  {id:'sam', messageCount:12, messages:[
+    {who:'them', text:'So I hear you\u2019re a coffee person.'},
+    {who:'me', text:'Borderline unhealthy amount, yes.'},
+    {who:'them', text:'Good. Come by the roastery sometime, on the house.'},
+    {who:'me', text:'That\u2019s a dangerous offer for me.'},
+    {who:'them', text:'Free this weekend?'},
+  ]},
+  {id:'alex', messageCount:1, messages:[
+    {who:'them', text:'Nice to match with you! Survived a 14hr shift to see this so it better be good.'},
+  ]},
+];
+
+let todayMatch = {id:'jordan', matchNo: 52, decided:null};
+let activeChatId = null;
+let replyIdx = 0;
+const REPLIES = [
+  "Haha fair point.",
+  "Okay I did not expect that answer.",
+  "That's such a Brisbane thing to say.",
+  "Wait, tell me more about that.",
+  "I'm into that energy.",
+  "Ok you've officially got my attention.",
+];
+
+function switchTab(tab){
+  document.querySelectorAll('.nav-item').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('screen-today').classList.toggle('active', tab==='today');
+  document.getElementById('screen-convos').classList.toggle('active', tab==='convos');
+  document.getElementById('screen-chat').style.display = 'none';
+  document.getElementById('bottomnav').style.display = 'flex';
+  activeChatId = null;
+  renderAll();
+}
+
+function renderAll(){
+  renderToday();
+  renderConvos();
+  document.getElementById('convoCount').textContent = convos.length;
+}
+
+function renderToday(){
+  const el = document.getElementById('screen-today');
+  if(todayMatch.decided){
+    el.innerHTML = `
+      <div class="empty-today">
+        <div class="icon-plus">+1</div>
+        <div class="big">${todayMatch.decided==='kept' ? 'Added to your chats' : 'See you tomorrow'}</div>
+        <div class="small">${todayMatch.decided==='kept' ? 'Say hello before the moment passes.' : 'Your next match unlocks tomorrow at 9am.'}</div>
+      </div>`;
+    return;
+  }
+  const p = people[todayMatch.id];
+  const c = colorFor(p.name);
+  el.innerHTML = `
+    <div class="match-eyebrow">Today's Match · No. ${String(todayMatch.matchNo).padStart(3,'0')}</div>
+    <div class="card">
+      <div class="photo-block" style="background:${c}">
+        <div class="photo-initial">${initials(p.name)}</div>
+        <div class="photo-text">
+          <div class="photo-name">${p.name}, ${p.age}</div>
+          <div class="photo-tagline">${p.tagline}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="info-row"><span>Lives in</span><span>Brisbane</span></div>
+        <div class="info-row"><span>Full profile</span><span>Unlocks as you chat</span></div>
+        <div class="actions">
+          <div class="btn btn-ghost" onclick="passToday()">Let Go</div>
+          <div class="btn btn-fill" onclick="keepToday()">Keep</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderConvos(){
+  const el = document.getElementById('screen-convos');
+  el.innerHTML = `<div class="section-label">Your 3 Conversations</div>` + convos.map(c=>{
+    const p = people[c.id];
+    const stage = stageFor(c.messageCount);
+    const last = c.messages[c.messages.length-1];
+    const pct = ((stage+1)/4)*100;
+    return `
+      <div class="convo-card" onclick="openChat('${c.id}')">
+        <div class="avatar-sm" style="background:${colorFor(p.name)}">${initials(p.name)}</div>
+        <div class="convo-info">
+          <div class="convo-name">${p.name}</div>
+          <div class="convo-preview">${last.who==='me'?'You: ':''}${last.text}</div>
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function passToday(){
+  todayMatch.decided = 'passed';
+  renderAll();
+}
+
+function keepToday(){
+  if(convos.length >= 3){
+    openSwapModal();
+  } else {
+    addTodayAsConvo();
+  }
+}
+
+function addTodayAsConvo(){
+  convos.push({id: todayMatch.id, messageCount:0, messages:[]});
+  todayMatch.decided = 'kept';
+  renderAll();
+  switchTab('convos');
+}
+
+function openSwapModal(){
+  const modal = document.getElementById('swapModal');
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-title">Your 3 spots are full</div>
+      <div class="modal-sub">Let one conversation go to make room for ${people[todayMatch.id].name}.</div>
+      ${convos.map(c=>{
+        const p = people[c.id];
+        return `<div class="swap-row">
+          <div class="avatar-sm" style="background:${colorFor(p.name)}">${initials(p.name)}</div>
+          <div class="swap-info"><div class="swap-name">${p.name}, ${p.age}</div></div>
+          <div class="swap-let-go" onclick="swapOut('${c.id}')">Let Go</div>
+        </div>`;
+      }).join('')}
+      <div class="modal-cancel" onclick="closeSwapModal()">Never mind, keep my 3</div>
+    </div>`;
+  modal.classList.add('active');
+}
+function closeSwapModal(){ document.getElementById('swapModal').classList.remove('active'); }
+function swapOut(id){
+  convos = convos.filter(c=>c.id!==id);
+  closeSwapModal();
+  addTodayAsConvo();
+}
+
+function openChat(id){
+  activeChatId = id;
+  document.getElementById('screen-today').classList.remove('active');
+  document.getElementById('screen-convos').classList.remove('active');
+  document.getElementById('bottomnav').style.display = 'none';
+  const chatScreen = document.getElementById('screen-chat');
+  chatScreen.style.display = 'flex';
+  renderChat();
+}
+
+function renderChat(){
+  const c = convos.find(c=>c.id===activeChatId);
+  const p = people[c.id];
+  const stage = stageFor(c.messageCount);
+  const chatScreen = document.getElementById('screen-chat');
+  chatScreen.innerHTML = `
+    <div class="chat-header">
+      <div class="back-btn" onclick="backToConvos()">&#8592;</div>
+      <div class="avatar-sm" style="background:${colorFor(p.name)}; width:38px; height:38px; font-size:14px;">${initials(p.name)}</div>
+      <div>
+        <div class="chat-name">${p.name}</div>
+        <div class="chat-sub">${stage+1}/4 profile unlocked</div>
+      </div>
+      <div class="view-profile" onclick="openDrawer()">Profile</div>
+    </div>
+    <div class="messages" id="msgList"></div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chatInput" placeholder="Message ${p.name}..." onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="send-btn" onclick="sendMsg()">&#8593;</button>
+    </div>`;
+  renderMessages();
+}
+
+function renderMessages(){
+  const c = convos.find(c=>c.id===activeChatId);
+  const list = document.getElementById('msgList');
+  list.innerHTML = c.messages.map(m=>{
+    if(m.who==='toast') return `<div class="toast">${m.text}</div>`;
+    return `<div class="bubble ${m.who}">${m.text}</div>`;
+  }).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+function backToConvos(){
+  document.getElementById('screen-chat').style.display = 'none';
+  switchTab('convos');
+}
+
+function sendMsg(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  const c = convos.find(c=>c.id===activeChatId);
+  const prevStage = stageFor(c.messageCount);
+  c.messages.push({who:'me', text});
+  c.messageCount++;
+  input.value='';
+  renderMessages();
+
+  setTimeout(()=>{
+    const reply = REPLIES[replyIdx % REPLIES.length];
+    replyIdx++;
+    c.messages.push({who:'them', text:reply});
+    c.messageCount++;
+    const newStage = stageFor(c.messageCount);
+    if(newStage > prevStage){
+      c.messages.push({who:'toast', text:`New profile info unlocked`});
+    }
+    renderMessages();
+    renderConvos();
+  }, 650);
+}
+
+function openDrawer(){
+  const c = convos.find(c=>c.id===activeChatId);
+  const p = people[c.id];
+  const stage = stageFor(c.messageCount);
+
+  const blocks = [
+    {min:0, title:'Basics', body:`<div class="pf-text">${p.name}, ${p.age}<br>${p.tagline}</div>`},
+    {min:1, title:'About', body:`<div class="pf-text">${p.bio}</div><div class="pf-text" style="margin-top:6px; color:var(--ink-soft); font-size:12.5px;">${p.job}</div>`},
+    {min:2, title:'Interests', body:`<div class="tags">${p.interests.map(i=>`<span class="tag">${i}</span>`).join('')}</div>`},
+    {min:3, title:'Looking For', body:`<div class="pf-text">${p.lookingFor}</div>`},
+  ];
+
+  const html = blocks.map(b=>{
+    const locked = stage < b.min;
+    const remaining = THRESHOLDS[b.min] - c.messageCount;
+    return `<div class="pf-block ${locked?'locked':''}">
+      <div class="pf-title">${locked?'&#128274; ':''}${b.title}</div>
+      ${locked ? `<div class="lock-note">Unlocks after ${remaining} more message${remaining===1?'':'s'}</div>` : b.body}
+    </div>`;
+  }).join('');
+
+  document.getElementById('profileDrawer').innerHTML = `
+    <div class="drawer-handle"></div>
+    <div class="drawer-body">
+      <div class="drawer-head">
+        <div class="avatar-sm" style="background:${colorFor(p.name)}">${initials(p.name)}</div>
+        <div>
+          <div class="chat-name">${p.name}, ${p.age}</div>
+          <div class="chat-sub">Profile stage ${stage+1} of 4</div>
+        </div>
+      </div>
+      ${html}
+    </div>`;
+  document.getElementById('profileDrawer').classList.add('active');
+  document.getElementById('drawerOverlay').classList.add('active');
+}
+function closeDrawer(){
+  document.getElementById('profileDrawer').classList.remove('active');
+  document.getElementById('drawerOverlay').classList.remove('active');
+}
+
+renderAll();
+</script>
+</body>
+</html>
