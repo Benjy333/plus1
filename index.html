@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Plus 1 — Prototype</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -454,6 +455,21 @@ body{
   font-weight:600;
   color:var(--ink-soft);
   cursor:pointer;
+}
+
+@media (max-width: 480px){
+  body{ padding:0; align-items:stretch; }
+  .stage-label{ display:none; }
+  .phone{
+    width:100vw;
+    height:100vh;
+    height:100dvh;
+    border-radius:0;
+    box-shadow:none;
+  }
+  .notch{ display:none; }
+  .app{ padding-top:env(safe-area-inset-top, 12px); }
+  .bottomnav{ padding-bottom:calc(18px + env(safe-area-inset-bottom, 0px)); }
 }
 </style>
 </head>
