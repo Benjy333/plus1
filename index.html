@@ -406,6 +406,22 @@ body{
   border-radius:999px;
 }
 .lock-note{font-size:12px; color:var(--lock); font-weight:600;}
+.photo-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:4px;}
+.photo-thumb{
+  width:100%;
+  aspect-ratio:1;
+  border-radius:14px;
+  background-size:cover;
+  background-position:center;
+}
+.photo-thumb.locked{
+  background:var(--paper);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--lock);
+  font-size:17px;
+}
 
 /* ---- SWAP MODAL ---- */
 .modal{
@@ -491,6 +507,26 @@ body{
 }
 .info-card-title{font-weight:700; font-size:14.5px; margin-bottom:3px;}
 .info-card-text{font-size:13px; color:var(--ink-soft); font-weight:500; line-height:1.45;}
+.info-cta{
+  display:block;
+  text-align:center;
+  text-decoration:none;
+  background:var(--rose);
+  color:var(--white);
+  font-weight:700;
+  font-size:14px;
+  padding:15px;
+  border-radius:999px;
+  margin-top:6px;
+  box-shadow:0 8px 20px rgba(250,62,82,0.3);
+}
+.info-cta-sub{
+  text-align:center;
+  font-size:11.5px;
+  color:var(--ink-soft);
+  font-weight:500;
+  margin-top:8px;
+}
 
 @media (max-width: 480px){
   body{ padding:0; align-items:stretch; }
@@ -560,13 +596,17 @@ function colorFor(name){
 function initials(name){ return name[0].toUpperCase(); }
 
 const PHOTOS = {
-  jordan:'https://i.pravatar.cc/500?img=13',
-  mia:'https://i.pravatar.cc/500?img=47',
-  sam:'https://i.pravatar.cc/500?img=52',
-  alex:'https://i.pravatar.cc/500?img=33',
+  jordan:['https://i.pravatar.cc/500?img=13','https://i.pravatar.cc/500?img=14','https://i.pravatar.cc/500?img=15','https://i.pravatar.cc/500?img=16','https://i.pravatar.cc/500?img=17','https://i.pravatar.cc/500?img=18'],
+  mia:['https://i.pravatar.cc/500?img=47','https://i.pravatar.cc/500?img=48','https://i.pravatar.cc/500?img=49','https://i.pravatar.cc/500?img=50','https://i.pravatar.cc/500?img=51','https://i.pravatar.cc/500?img=44'],
+  sam:['https://i.pravatar.cc/500?img=52','https://i.pravatar.cc/500?img=53','https://i.pravatar.cc/500?img=54','https://i.pravatar.cc/500?img=55','https://i.pravatar.cc/500?img=56','https://i.pravatar.cc/500?img=57'],
+  alex:['https://i.pravatar.cc/500?img=33','https://i.pravatar.cc/500?img=34','https://i.pravatar.cc/500?img=35','https://i.pravatar.cc/500?img=36','https://i.pravatar.cc/500?img=37','https://i.pravatar.cc/500?img=38'],
 };
 function photoStyle(id){
-  return `background-image:url('${PHOTOS[id]}')`;
+  return `background-image:url('${PHOTOS[id][0]}')`;
+}
+const PHOTO_UNLOCK_INTERVAL = 6; // messages per back-and-forth-of-3 (3 exchanges = 6 messages)
+function photosUnlocked(messageCount){
+  return Math.min(1 + Math.floor(messageCount / PHOTO_UNLOCK_INTERVAL), PHOTOS.jordan.length);
 }
 
 const THRESHOLDS = [0,3,6,10]; // stage 0..3
@@ -667,7 +707,9 @@ function renderInfo(){
         <div class="info-card-title">Profiles unlock as you talk</div>
         <div class="info-card-text">You start with the basics. Keep messaging to unlock more of who they are.</div>
       </div>
-    </div>`;
+    </div>
+    <a class="info-cta" href="plus1-pitch.pdf" target="_blank" rel="noopener">Read the full pitch deck</a>
+    <div class="info-cta-sub">Problem, market, business model, and go-to-market plan</div>`;
 }
 
 function renderToday(){
@@ -787,7 +829,7 @@ function renderChat(){
       <div class="avatar-sm" style="${photoStyle(c.id)}; width:38px; height:38px; font-size:14px;"></div>
       <div>
         <div class="chat-name">${p.name}</div>
-        <div class="chat-sub">${stage+1}/4 profile unlocked</div>
+        <div class="chat-sub">${photosUnlocked(c.messageCount)}/${PHOTOS[c.id].length} photos unlocked</div>
       </div>
       <div class="view-profile" onclick="openDrawer()">Profile</div>
     </div>
@@ -797,6 +839,12 @@ function renderChat(){
       <button class="send-btn" onclick="sendMsg()">&#8593;</button>
     </div>`;
   renderMessages();
+}
+
+function renderChatHeader(){
+  const c = convos.find(c=>c.id===activeChatId);
+  const sub = document.querySelector('#screen-chat .chat-sub');
+  if(sub) sub.textContent = `${photosUnlocked(c.messageCount)}/${PHOTOS[c.id].length} photos unlocked`;
 }
 
 function renderMessages(){
@@ -820,6 +868,7 @@ function sendMsg(){
   if(!text) return;
   const c = convos.find(c=>c.id===activeChatId);
   const prevStage = stageFor(c.messageCount);
+  const prevPhotos = photosUnlocked(c.messageCount);
   c.messages.push({who:'me', text});
   c.messageCount++;
   input.value='';
@@ -831,11 +880,15 @@ function sendMsg(){
     c.messages.push({who:'them', text:reply});
     c.messageCount++;
     const newStage = stageFor(c.messageCount);
-    if(newStage > prevStage){
+    const newPhotos = photosUnlocked(c.messageCount);
+    if(newPhotos > prevPhotos){
+      c.messages.push({who:'toast', text:`New photo unlocked`});
+    } else if(newStage > prevStage){
       c.messages.push({who:'toast', text:`New profile info unlocked`});
     }
     renderMessages();
     renderConvos();
+    renderChatHeader();
   }, 650);
 }
 
@@ -843,6 +896,20 @@ function openDrawer(){
   const c = convos.find(c=>c.id===activeChatId);
   const p = people[c.id];
   const stage = stageFor(c.messageCount);
+  const photoCount = photosUnlocked(c.messageCount);
+  const totalPhotos = PHOTOS[c.id].length;
+  const nextPhotoIn = photoCount * PHOTO_UNLOCK_INTERVAL - c.messageCount;
+
+  const photoGrid = PHOTOS[c.id].map((url, i)=>{
+    if(i < photoCount) return `<div class="photo-thumb" style="background-image:url('${url}')"></div>`;
+    return `<div class="photo-thumb locked">&#128274;</div>`;
+  }).join('');
+
+  const photoBlock = `<div class="pf-block">
+    <div class="pf-title">Photos (${photoCount}/${totalPhotos})</div>
+    <div class="photo-grid">${photoGrid}</div>
+    ${photoCount < totalPhotos ? `<div class="lock-note" style="margin-top:8px; display:block;">Next photo unlocks after ${nextPhotoIn} more message${nextPhotoIn===1?'':'s'}</div>` : ''}
+  </div>`;
 
   const blocks = [
     {min:0, title:'Basics', body:`<div class="pf-text">${p.name}, ${p.age}<br>${p.tagline}</div>`},
@@ -851,7 +918,7 @@ function openDrawer(){
     {min:3, title:'Looking For', body:`<div class="pf-text">${p.lookingFor}</div>`},
   ];
 
-  const html = blocks.map(b=>{
+  const html = photoBlock + blocks.map(b=>{
     const locked = stage < b.min;
     const remaining = THRESHOLDS[b.min] - c.messageCount;
     return `<div class="pf-block ${locked?'locked':''}">
