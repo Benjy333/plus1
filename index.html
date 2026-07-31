@@ -79,6 +79,13 @@ body{
   letter-spacing:-0.02em;
 }
 .wordmark span{color:var(--rose);}
+.tagline{
+  font-size:11px;
+  font-weight:600;
+  color:var(--ink-soft);
+  margin-top:2px;
+}
+.tagline span{color:var(--rose);}
 .screen{
   flex:1;
   overflow-y:auto;
@@ -676,9 +683,8 @@ function renderInfo(){
   const el = document.getElementById('screen-info');
   el.innerHTML = `
     <div class="info-hero">
-      <div class="mark">+1</div>
       <div class="title">How Plus 1 works</div>
-      <div class="sub">Slower by design. No swiping.</div>
+      <div class="sub">The <span style="color:var(--rose); font-weight:700;">no-swipe</span> dating app.</div>
     </div>
     <div class="info-card">
       <div class="info-num">1</div>
