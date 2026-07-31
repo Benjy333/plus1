@@ -107,20 +107,14 @@ body{
   display:flex;
   align-items:flex-end;
   padding:22px;
+  background-size:cover;
+  background-position:center;
 }
 .photo-block::after{
   content:"";
   position:absolute;
   inset:0;
   background:linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%);
-}
-.photo-initial{
-  position:absolute;
-  top:50%; left:50%;
-  transform:translate(-50%,-58%);
-  font-weight:800;
-  font-size:76px;
-  color:rgba(255,255,255,0.55);
 }
 .photo-text{position:relative; z-index:2; color:var(--white);}
 .photo-name{font-weight:800; font-size:25px;}
@@ -205,6 +199,8 @@ body{
   font-weight:800;
   font-size:18px;
   color:var(--white);
+  background-size:cover;
+  background-position:center;
 }
 .convo-info{flex:1; min-width:0;}
 .convo-name{font-weight:700; font-size:15px;}
@@ -563,6 +559,16 @@ function colorFor(name){
 }
 function initials(name){ return name[0].toUpperCase(); }
 
+const PHOTOS = {
+  jordan:'https://i.pravatar.cc/500?img=13',
+  mia:'https://i.pravatar.cc/500?img=47',
+  sam:'https://i.pravatar.cc/500?img=52',
+  alex:'https://i.pravatar.cc/500?img=33',
+};
+function photoStyle(id){
+  return `background-image:url('${PHOTOS[id]}')`;
+}
+
 const THRESHOLDS = [0,3,6,10]; // stage 0..3
 function stageFor(count){
   let s=0;
@@ -676,12 +682,10 @@ function renderToday(){
     return;
   }
   const p = people[todayMatch.id];
-  const c = colorFor(p.name);
   el.innerHTML = `
     <div class="match-eyebrow">Today's Match · No. ${String(todayMatch.matchNo).padStart(3,'0')}</div>
     <div class="card">
-      <div class="photo-block" style="background:${c}">
-        <div class="photo-initial">${initials(p.name)}</div>
+      <div class="photo-block" style="${photoStyle(todayMatch.id)}">
         <div class="photo-text">
           <div class="photo-name">${p.name}, ${p.age}</div>
           <div class="photo-tagline">${p.tagline}</div>
@@ -707,7 +711,7 @@ function renderConvos(){
     const pct = ((stage+1)/4)*100;
     return `
       <div class="convo-card" onclick="openChat('${c.id}')">
-        <div class="avatar-sm" style="background:${colorFor(p.name)}">${initials(p.name)}</div>
+        <div class="avatar-sm" style="${photoStyle(c.id)}"></div>
         <div class="convo-info">
           <div class="convo-name">${p.name}</div>
           <div class="convo-preview">${last.who==='me'?'You: ':''}${last.text}</div>
@@ -746,7 +750,7 @@ function openSwapModal(){
       ${convos.map(c=>{
         const p = people[c.id];
         return `<div class="swap-row">
-          <div class="avatar-sm" style="background:${colorFor(p.name)}">${initials(p.name)}</div>
+          <div class="avatar-sm" style="${photoStyle(c.id)}"></div>
           <div class="swap-info"><div class="swap-name">${p.name}, ${p.age}</div></div>
           <div class="swap-let-go" onclick="swapOut('${c.id}')">Let Go</div>
         </div>`;
@@ -780,7 +784,7 @@ function renderChat(){
   chatScreen.innerHTML = `
     <div class="chat-header">
       <div class="back-btn" onclick="backToConvos()">&#8592;</div>
-      <div class="avatar-sm" style="background:${colorFor(p.name)}; width:38px; height:38px; font-size:14px;">${initials(p.name)}</div>
+      <div class="avatar-sm" style="${photoStyle(c.id)}; width:38px; height:38px; font-size:14px;"></div>
       <div>
         <div class="chat-name">${p.name}</div>
         <div class="chat-sub">${stage+1}/4 profile unlocked</div>
@@ -860,7 +864,7 @@ function openDrawer(){
     <div class="drawer-handle"></div>
     <div class="drawer-body">
       <div class="drawer-head">
-        <div class="avatar-sm" style="background:${colorFor(p.name)}">${initials(p.name)}</div>
+        <div class="avatar-sm" style="${photoStyle(c.id)}"></div>
         <div>
           <div class="chat-name">${p.name}, ${p.age}</div>
           <div class="chat-sub">Profile stage ${stage+1} of 4</div>
