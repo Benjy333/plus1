@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Plus 1 — Live App (Phase 1)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --paper:#F7F7F5; --ink:#1F2024; --ink-soft:#8B8D97;
+  --rose:#FA3E52; --rose-soft:#FFE9EB; --border:#ECEBE7; --white:#FFFFFF;
+  --shadow: 0 10px 30px rgba(31,32,36,0.07), 0 2px 8px rgba(31,32,36,0.04);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background:var(--paper); font-family:'Manrope',sans-serif; color:var(--ink);
+  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+}
+.wrap{ width:100%; max-width:420px; }
+.wordmark{ font-weight:800; font-size:22px; text-align:center; margin-bottom:6px; }
+.wordmark span{ color:var(--rose); }
+.subhead{ text-align:center; color:var(--ink-soft); font-size:12.5px; font-weight:600; margin-bottom:28px; }
+.card{ background:var(--white); border-radius:24px; box-shadow:var(--shadow); padding:24px; }
+h2{ font-size:17px; margin-bottom:16px; }
+label{ font-size:12px; font-weight:700; color:var(--ink-soft); display:block; margin:14px 0 5px; }
+input{
+  width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px;
+  font-size:14px; font-family:'Manrope',sans-serif; outline:none;
+}
+input:focus{ border-color:var(--rose); }
+.btn{
+  width:100%; padding:14px; border-radius:999px; border:none; font-weight:700; font-size:14px;
+  cursor:pointer; margin-top:18px; background:var(--rose); color:var(--white);
+}
+.btn:active{ transform:scale(0.98); }
+.switch{ text-align:center; font-size:12.5px; color:var(--ink-soft); margin-top:16px; cursor:pointer; }
+.switch b{ color:var(--rose); }
+.err{ background:var(--rose-soft); color:var(--rose); font-size:12.5px; font-weight:600; padding:10px 14px; border-radius:10px; margin-top:14px; display:none; }
+
+/* app shell once logged in */
+.app{ display:none; width:100%; max-width:420px; height:88vh; background:var(--white); border-radius:28px; box-shadow:var(--shadow); overflow:hidden; display:none; flex-direction:column; }
+.app.active{ display:flex; }
+.topbar{ padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.topbar .wordmark{ margin:0; font-size:18px; text-align:left; }
+.signout{ font-size:12px; color:var(--ink-soft); cursor:pointer; font-weight:600; }
+.tabs{ display:flex; border-bottom:1px solid var(--border); }
+.tab{ flex:1; text-align:center; padding:12px; font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; }
+.tab.active{ color:var(--rose); border-color:var(--rose); }
+.panel{ flex:1; overflow-y:auto; padding:16px 18px; display:none; }
+.panel.active{ display:block; }
+.person-card{
+  display:flex; align-items:center; gap:12px; background:var(--paper); border-radius:16px;
+  padding:12px 14px; margin-bottom:10px; cursor:pointer;
+}
+.avatar{ width:44px; height:44px; border-radius:50%; background:var(--rose); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex-shrink:0; }
+.person-name{ font-weight:700; font-size:14px; }
+.person-sub{ font-size:12px; color:var(--ink-soft); }
+.empty{ text-align:center; color:var(--ink-soft); font-size:13px; margin-top:40px; }
+
+.chat-header{ display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--border); }
+.back{ cursor:pointer; font-size:18px; }
+.messages{ flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:8px; background:var(--paper); }
+.bubble{ max-width:75%; padding:10px 14px; border-radius:18px; font-size:13.5px; line-height:1.4; }
+.bubble.me{ align-self:flex-end; background:var(--rose); color:#fff; border-bottom-right-radius:5px; }
+.bubble.them{ align-self:flex-start; background:var(--white); box-shadow:0 2px 8px rgba(31,32,36,0.05); border-bottom-left-radius:5px; }
+.input-row{ display:flex; gap:8px; padding:14px 16px; border-top:1px solid var(--border); }
+.input-row input{ flex:1; border-radius:999px; }
+.send{ width:42px; height:42px; border-radius:50%; background:var(--rose); color:#fff; border:none; cursor:pointer; font-size:15px; flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<!-- ========== AUTH SCREEN ========== -->
+<div class="wrap" id="authScreen">
+  <div class="wordmark">Plus<span>+1</span></div>
+  <div class="subhead">THE NO-SWIPE DATING APP</div>
+  <div class="card">
+    <h2 id="authTitle">Log in</h2>
+    <div id="nameField" style="display:none;">
+      <label>Your name</label>
+      <input type="text" id="nameInput" placeholder="Jordan">
+    </div>
+    <label>Email</label>
+    <input type="email" id="emailInput" placeholder="you@email.com">
+    <label>Password</label>
+    <input type="password" id="passInput" placeholder="At least 6 characters">
+    <button class="btn" id="authBtn">Log in</button>
+    <div class="err" id="authErr"></div>
+    <div class="switch" id="authSwitch">New here? <b>Create an account</b></div>
+  </div>
+</div>
+
+<!-- ========== APP SHELL ========== -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="wordmark">Plus<span>+1</span></div>
+    <div class="signout" id="signOutBtn">Sign out</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="people" onclick="switchTab('people')">People</div>
+    <div class="tab" data-tab="chats" onclick="switchTab('chats')">Chats</div>
+  </div>
+  <div class="panel active" id="panel-people"></div>
+  <div class="panel" id="panel-chats"></div>
+  <div class="panel" id="panel-chat" style="padding:0; display:none; flex-direction:column;"></div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — paste your Supabase project details here
+// Find these in Supabase Dashboard > Project Settings > API
+// ============================================================
+const SUPABASE_URL = "https://rkykfarljdbaytvyppme.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_rFGDY8vlPru-tQ3h1X2X-A_rScuKjrF";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let currentProfile = null;
+let activeConversation = null;
+let messageChannel = null;
+
+function initials(name){ return (name||'?')[0].toUpperCase(); }
+
+// ---------- AUTH ----------
+let mode = 'login'; // or 'signup'
+
+document.getElementById('authSwitch').onclick = () => {
+  mode = mode === 'login' ? 'signup' : 'login';
+  document.getElementById('authTitle').textContent = mode === 'login' ? 'Log in' : 'Create your account';
+  document.getElementById('authBtn').textContent = mode === 'login' ? 'Log in' : 'Sign up';
+  document.getElementById('nameField').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('authSwitch').innerHTML = mode === 'login'
+    ? 'New here? <b>Create an account</b>' : 'Already have an account? <b>Log in</b>';
+  document.getElementById('authErr').style.display = 'none';
+};
+
+document.getElementById('authBtn').onclick = async () => {
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passInput').value;
+  const name = document.getElementById('nameInput').value.trim();
+  const errBox = document.getElementById('authErr');
+  errBox.style.display = 'none';
+
+  if(!email || !password || (mode==='signup' && !name)){
+    errBox.textContent = 'Please fill in every field.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  if(mode === 'signup'){
+    const { data, error } = await sb.auth.signUp({
+      email, password, options: { data: { name } }
+    });
+    if(error){ errBox.textContent = error.message; errBox.style.display='block'; return; }
+    // if email confirmation is off, session exists immediately
+    if(data.session){ await onLoggedIn(); }
+    else { errBox.style.color = 'var(--ink)'; errBox.textContent = 'Check your email to confirm your account, then log in.'; errBox.style.display='block'; }
+  } else {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){ errBox.textContent = error.message; errBox.style.display='block'; return; }
+    await onLoggedIn();
+  }
+};
+
+document.getElementById('signOutBtn').onclick = async () => {
+  await sb.auth.signOut();
+  location.reload();
+};
+
+async function onLoggedIn(){
+  const { data: { user } } = await sb.auth.getUser();
+  currentUser = user;
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  currentProfile = profile;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+  loadPeople();
+  loadChats();
+}
+
+// ---------- PEOPLE TAB ----------
+async function loadPeople(){
+  const panel = document.getElementById('panel-people');
+  const { data: people, error } = await sb.from('profiles').select('*').neq('id', currentUser.id);
+  if(error || !people || people.length === 0){
+    panel.innerHTML = `<div class="empty">No one else has signed up yet.<br>Invite a friend to test messaging with you!</div>`;
+    return;
+  }
+  panel.innerHTML = people.map(p => `
+    <div class="person-card" onclick="startConversation('${p.id}')">
+      <div class="avatar">${initials(p.name)}</div>
+      <div>
+        <div class="person-name">${p.name}</div>
+        <div class="person-sub">${p.tagline || 'Say hello'}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function startConversation(otherId){
+  // check for an existing conversation between these two people
+  const { data: existing } = await sb.from('conversations')
+    .select('*')
+    .or(`and(user_a.eq.${currentUser.id},user_b.eq.${otherId}),and(user_a.eq.${otherId},user_b.eq.${currentUser.id})`)
+    .maybeSingle();
+
+  let convo = existing;
+  if(!convo){
+    const { data: created, error } = await sb.from('conversations')
+      .insert({ user_a: currentUser.id, user_b: otherId })
+      .select().single();
+    if(error){ alert(error.message); return; }
+    convo = created;
+  }
+  openChat(convo.id, otherId);
+}
+
+// ---------- CHATS TAB ----------
+async function loadChats(){
+  const panel = document.getElementById('panel-chats');
+  const { data: convos } = await sb.from('conversations')
+    .select('*')
+    .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`)
+    .order('last_message_at', { ascending: false });
+
+  if(!convos || convos.length === 0){
+    panel.innerHTML = `<div class="empty">No conversations yet.<br>Go to People to say hello.</div>`;
+    return;
+  }
+  const otherIds = convos.map(c => c.user_a === currentUser.id ? c.user_b : c.user_a);
+  const { data: profiles } = await sb.from('profiles').select('*').in('id', otherIds);
+  const profileMap = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
+
+  panel.innerHTML = convos.map(c => {
+    const otherId = c.user_a === currentUser.id ? c.user_b : c.user_a;
+    const p = profileMap[otherId] || { name: 'Unknown' };
+    return `
+      <div class="person-card" onclick="openChat('${c.id}','${otherId}')">
+        <div class="avatar">${initials(p.name)}</div>
+        <div>
+          <div class="person-name">${p.name}</div>
+          <div class="person-sub">${c.message_count} messages</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('panel-people').classList.toggle('active', tab === 'people');
+  document.getElementById('panel-chats').classList.toggle('active', tab === 'chats');
+  document.getElementById('panel-chat').style.display = 'none';
+  if(tab === 'chats') loadChats();
+}
+
+// ---------- CHAT SCREEN ----------
+async function openChat(conversationId, otherId){
+  activeConversation = conversationId;
+  document.getElementById('panel-people').classList.remove('active');
+  document.getElementById('panel-chats').classList.remove('active');
+  const chatPanel = document.getElementById('panel-chat');
+  chatPanel.style.display = 'flex';
+
+  const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+
+  chatPanel.innerHTML = `
+    <div class="chat-header">
+      <div class="back" onclick="switchTab('chats')">&#8592;</div>
+      <div class="avatar" style="width:36px;height:36px;font-size:13px;">${initials(other.name)}</div>
+      <div class="person-name">${other.name}</div>
+    </div>
+    <div class="messages" id="msgList"></div>
+    <div class="input-row">
+      <input type="text" id="msgInput" placeholder="Message ${other.name}...">
+      <button class="send" onclick="sendMessage()">&#8593;</button>
+    </div>`;
+
+  document.getElementById('msgInput').addEventListener('keydown', e => {
+    if(e.key === 'Enter') sendMessage();
+  });
+
+  await loadMessages(conversationId);
+  subscribeToMessages(conversationId);
+}
+
+async function loadMessages(conversationId){
+  const { data: messages } = await sb.from('messages')
+    .select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+  renderMessages(messages || []);
+}
+
+function renderMessages(messages){
+  const list = document.getElementById('msgList');
+  if(!list) return;
+  list.innerHTML = messages.map(m => `
+    <div class="bubble ${m.sender_id === currentUser.id ? 'me' : 'them'}">${escapeHtml(m.body)}</div>
+  `).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function subscribeToMessages(conversationId){
+  if(messageChannel) sb.removeChannel(messageChannel);
+  messageChannel = sb.channel('messages-' + conversationId)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'messages',
+      filter: `conversation_id=eq.${conversationId}`
+    }, () => {
+      loadMessages(conversationId);
+    })
+    .subscribe();
+}
+
+async function sendMessage(){
+  const input = document.getElementById('msgInput');
+  const body = input.value.trim();
+  if(!body) return;
+  input.value = '';
+  const { error } = await sb.from('messages').insert({
+    conversation_id: activeConversation,
+    sender_id: currentUser.id,
+    body
+  });
+  if(error) alert(error.message);
+}
+
+// ---------- ON LOAD: resume session if already logged in ----------
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){ await onLoggedIn(); }
+})();
+</script>
+</body>
+</html>
