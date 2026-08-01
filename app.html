@@ -84,6 +84,15 @@ input:focus{ border-color:var(--rose); }
 .pf-section:last-child{ border-bottom:none; }
 .pf-label{ font-size:11px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px; }
 .pf-text{ font-size:13.5px; font-weight:500; line-height:1.5; }
+.report-link{ text-align:center; font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; padding:10px; margin-top:6px; }
+.report-modal-overlay{ position:absolute; inset:0; background:rgba(31,32,36,0.5); z-index:110; display:none; align-items:flex-end; }
+.report-modal-overlay.active{ display:flex; }
+.report-modal{ background:var(--white); width:100%; border-radius:24px 24px 0 0; padding:22px; }
+.report-modal h3{ font-size:16px; margin-bottom:4px; }
+.report-modal .sub{ font-size:12.5px; color:var(--ink-soft); margin-bottom:14px; }
+select.report-select{ width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:14px; font-family:'Manrope',sans-serif; outline:none; background:#fff; margin-bottom:10px; }
+textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13.5px; font-family:'Manrope',sans-serif; outline:none; resize:none; min-height:80px; }
+.report-cancel{ text-align:center; font-size:12.5px; color:var(--ink-soft); font-weight:600; margin-top:12px; cursor:pointer; }
 .empty{ text-align:center; color:var(--ink-soft); font-size:13px; margin-top:40px; }
 .person-card.waiting{ background:var(--rose-soft); }
 .waiting-badge{
@@ -193,6 +202,8 @@ input:focus{ border-color:var(--rose); }
 
   <div class="overlay" id="profileOverlay" onclick="closeProfile()"></div>
   <div class="profile-drawer" id="profileDrawer"></div>
+
+  <div class="report-modal-overlay" id="reportOverlay"></div>
 </div>
 
 <script>
@@ -445,7 +456,11 @@ function renderInfoTab(){
       <input type="email" id="referralEmailInput" placeholder="friend@email.com" style="flex:1; border:1.5px solid var(--border); border-radius:12px; padding:11px 13px; font-size:13px; font-family:'Manrope',sans-serif; outline:none;">
       <button class="send" onclick="addReferral()" style="width:auto; padding:0 16px; border-radius:12px;">Add</button>
     </div>
-    <div class="err" id="referralErr" style="display:none;"></div>`;
+    <div class="err" id="referralErr" style="display:none;"></div>
+
+    <div class="pf-label" style="margin-top:24px;">Report a problem</div>
+    <div class="info-card-text" style="margin-bottom:10px;">Something not working, or a safety concern that isn't about a specific person? Let us know.</div>
+    <div class="report-link" onclick="openReportModal(null, null)">&#9873; Report a problem</div>`;
   loadReferrals();
 }
 
@@ -487,6 +502,58 @@ async function addReferral(){
   loadReferrals();
 }
 
+// ---------- REPORT A PERSON / REPORT A PROBLEM ----------
+function openReportModal(reportedUserId, reportedName){
+  const overlay = document.getElementById('reportOverlay');
+  const isPerson = !!reportedUserId;
+  const categoryOptions = isPerson
+    ? `<option value="fake_profile">Fake profile</option>
+       <option value="harassment">Harassment or abuse</option>
+       <option value="inappropriate">Inappropriate content</option>
+       <option value="safety">Safety concern</option>
+       <option value="other">Other</option>`
+    : `<option value="technical">Something's broken</option>
+       <option value="safety">Safety concern</option>
+       <option value="other">Other</option>`;
+
+  overlay.innerHTML = `
+    <div class="report-modal">
+      <h3>${isPerson ? 'Report ' + reportedName : 'Report a problem'}</h3>
+      <div class="sub">${isPerson ? 'This is sent privately — they won\'t be notified.' : 'Tell us what happened.'}</div>
+      <select class="report-select" id="reportCategory">${categoryOptions}</select>
+      <textarea class="report-desc" id="reportDescription" placeholder="${isPerson ? 'What happened?' : 'Describe the issue...'}"></textarea>
+      <div class="err" id="reportErr" style="display:none;"></div>
+      <button class="btn" onclick="submitReport(${reportedUserId ? `'${reportedUserId}'` : 'null'})">Submit report</button>
+      <div class="report-cancel" onclick="closeReportModal()">Cancel</div>
+    </div>`;
+  overlay.classList.add('active');
+}
+
+function closeReportModal(){
+  document.getElementById('reportOverlay').classList.remove('active');
+}
+
+async function submitReport(reportedUserId){
+  const category = document.getElementById('reportCategory').value;
+  const description = document.getElementById('reportDescription').value.trim();
+  const errBox = document.getElementById('reportErr');
+
+  const { error } = await sb.from('reports').insert({
+    reporter_id: currentUser.id,
+    reported_user_id: reportedUserId,
+    category, description
+  });
+
+  if(error){
+    errBox.textContent = error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  closeReportModal();
+  closeProfile();
+  alert('Thanks — your report has been submitted.');
+}
+
 // ---------- VIEW PROFILE ----------
 async function openProfile(userId){
   const { data: p } = await sb.from('profiles').select('*').eq('id', userId).single();
@@ -505,6 +572,7 @@ async function openProfile(userId){
     ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
     ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
     ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
+    <div class="report-link" onclick="openReportModal('${p.id}', '${(p.name||'').replace(/'/g,"\\'")}')">&#9873; Report ${p.name}</div>
   `;
   drawer.classList.add('active');
   document.getElementById('profileOverlay').classList.add('active');
