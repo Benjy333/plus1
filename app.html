@@ -115,6 +115,15 @@ input:focus{ border-color:var(--rose); }
     <div id="nameField" style="display:none;">
       <label>Your name</label>
       <input type="text" id="nameInput" placeholder="Jordan">
+      <label>Age</label>
+      <input type="number" id="ageInput" placeholder="29" min="18" max="99">
+      <label>Brisbane suburb</label>
+      <input type="text" id="suburbInput" placeholder="New Farm">
+      <label>Profession</label>
+      <input type="text" id="professionInput" placeholder="Photographer">
+      <label>A few interests</label>
+      <input type="text" id="interestsInput" placeholder="Hiking, film photography, vinyl">
+      <div style="font-size:11px; color:var(--ink-soft); margin-top:10px; line-height:1.4;">You'll start as <b>not yet verified</b> — verification happens by attending an in-person Plus 1 meetup.</div>
     </div>
     <label>Email</label>
     <input type="email" id="emailInput" placeholder="you@email.com">
@@ -177,11 +186,18 @@ document.getElementById('authBtn').onclick = async () => {
   const email = document.getElementById('emailInput').value.trim();
   const password = document.getElementById('passInput').value;
   const name = document.getElementById('nameInput').value.trim();
+  const age = document.getElementById('ageInput').value.trim();
+  const suburb = document.getElementById('suburbInput').value.trim();
+  const profession = document.getElementById('professionInput').value.trim();
+  const interests = document.getElementById('interestsInput').value.trim();
   const errBox = document.getElementById('authErr');
   errBox.style.display = 'none';
+  errBox.style.color = 'var(--rose)';
 
-  if(!email || !password || (mode==='signup' && !name)){
-    errBox.textContent = 'Please fill in every field.';
+  if(!email || !password || (mode==='signup' && (!name || !age || !suburb))){
+    errBox.textContent = mode === 'signup'
+      ? 'Please fill in name, age, and suburb at least.'
+      : 'Please fill in every field.';
     errBox.style.display = 'block';
     return;
   }
@@ -191,8 +207,14 @@ document.getElementById('authBtn').onclick = async () => {
       email, password, options: { data: { name } }
     });
     if(error){ errBox.textContent = error.message; errBox.style.display='block'; return; }
-    // if email confirmation is off, session exists immediately
-    if(data.session){ await onLoggedIn(); }
+    if(data.session){
+      // fill in the bio fields on the auto-created profile row
+      await sb.from('profiles').update({
+        age: age ? parseInt(age) : null,
+        suburb, profession, interests, verified: false
+      }).eq('id', data.user.id);
+      await onLoggedIn();
+    }
     else { errBox.style.color = 'var(--ink)'; errBox.textContent = 'Check your email to confirm your account, then log in.'; errBox.style.display='block'; }
   } else {
     const { error } = await sb.auth.signInWithPassword({ email, password });
@@ -229,8 +251,8 @@ async function loadPeople(){
     <div class="person-card" onclick="startConversation('${p.id}')">
       <div class="avatar">${initials(p.name)}</div>
       <div>
-        <div class="person-name">${p.name}</div>
-        <div class="person-sub">${p.tagline || 'Say hello'}</div>
+        <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.verified ? '<span style="color:var(--rose); font-size:11px;">&#9989; Verified</span>' : '<span style="color:var(--ink-soft); font-size:11px;">Not yet verified</span>'}</div>
+        <div class="person-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || p.tagline || 'Say hello'}</div>
       </div>
     </div>`).join('');
 }
