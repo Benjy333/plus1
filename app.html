@@ -57,6 +57,13 @@ input:focus{ border-color:var(--rose); }
 .avatar{ width:44px; height:44px; border-radius:50%; background:var(--rose); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex-shrink:0; }
 .person-name{ font-weight:700; font-size:14px; }
 .person-sub{ font-size:12px; color:var(--ink-soft); }
+.verify-badges{ display:flex; gap:6px; margin-top:5px; flex-wrap:wrap; }
+.v-badge{
+  font-size:10px; font-weight:700; color:var(--ink-soft);
+  background:var(--white); border:1px solid var(--border);
+  padding:2px 7px; border-radius:999px;
+}
+.v-badge.on{ color:var(--rose); border-color:var(--rose-soft); background:var(--rose-soft); }
 .empty{ text-align:center; color:var(--ink-soft); font-size:13px; margin-top:40px; }
 
 .chat-header{ display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--border); }
@@ -123,7 +130,7 @@ input:focus{ border-color:var(--rose); }
       <input type="text" id="professionInput" placeholder="Photographer">
       <label>A few interests</label>
       <input type="text" id="interestsInput" placeholder="Hiking, film photography, vinyl">
-      <div style="font-size:11px; color:var(--ink-soft); margin-top:10px; line-height:1.4;">You'll start as <b>not yet verified</b> — verification happens by attending an in-person Plus 1 meetup.</div>
+      <div style="font-size:11px; color:var(--ink-soft); margin-top:10px; line-height:1.4;">Trust builds in 3 steps: <b>email</b>, <b>ID</b>, and <b>in-person</b> verification at a Plus 1 meetup. You'll start with none checked off.</div>
     </div>
     <label>Email</label>
     <input type="email" id="emailInput" placeholder="you@email.com">
@@ -211,7 +218,8 @@ document.getElementById('authBtn').onclick = async () => {
       // fill in the bio fields on the auto-created profile row
       await sb.from('profiles').update({
         age: age ? parseInt(age) : null,
-        suburb, profession, interests, verified: false
+        suburb, profession, interests,
+        email_verified: false, id_verified: false, meetup_verified: false
       }).eq('id', data.user.id);
       await onLoggedIn();
     }
@@ -251,10 +259,23 @@ async function loadPeople(){
     <div class="person-card" onclick="startConversation('${p.id}')">
       <div class="avatar">${initials(p.name)}</div>
       <div>
-        <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.verified ? '<span style="color:var(--rose); font-size:11px;">&#9989; Verified</span>' : '<span style="color:var(--ink-soft); font-size:11px;">Not yet verified</span>'}</div>
+        <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
         <div class="person-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || p.tagline || 'Say hello'}</div>
+        <div class="verify-badges">${verificationBadges(p)}</div>
       </div>
     </div>`).join('');
+}
+
+function verificationBadges(p){
+  const tiers = [
+    { key: 'email_verified', label: 'Email' },
+    { key: 'id_verified', label: 'ID' },
+    { key: 'meetup_verified', label: 'In person' },
+  ];
+  return tiers.map(t => {
+    const on = !!p[t.key];
+    return `<span class="v-badge ${on ? 'on' : ''}">${on ? '&#9989;' : '&#9675;'} ${t.label}</span>`;
+  }).join('');
 }
 
 async function startConversation(otherId){
