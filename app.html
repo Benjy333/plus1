@@ -93,6 +93,7 @@ input:focus{ border-color:var(--rose); }
 select.report-select{ width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:14px; font-family:'Manrope',sans-serif; outline:none; background:#fff; margin-bottom:10px; }
 textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13.5px; font-family:'Manrope',sans-serif; outline:none; resize:none; min-height:80px; }
 .report-cancel{ text-align:center; font-size:12.5px; color:var(--ink-soft); font-weight:600; margin-top:12px; cursor:pointer; }
+.photo-upload-label{ display:inline-block; font-size:11.5px; font-weight:700; color:var(--rose); cursor:pointer; margin-top:4px; }
 .empty{ text-align:center; color:var(--ink-soft); font-size:13px; margin-top:40px; }
 .person-card.waiting{ background:var(--rose-soft); }
 .waiting-badge{
@@ -222,6 +223,9 @@ let activeConversation = null;
 let messageChannel = null;
 
 function initials(name){ return (name||'?')[0].toUpperCase(); }
+function avatarBg(p){
+  return p && p.avatar_url ? `background-image:url('${p.avatar_url}'); background-size:cover; background-position:center; color:transparent;` : '';
+}
 
 // ---------- AUTH ----------
 let mode = 'login'; // or 'signup'
@@ -305,7 +309,7 @@ async function loadPeople(){
   }
   panel.innerHTML = people.map(p => `
     <div class="person-card">
-      <div class="avatar" onclick="event.stopPropagation(); openProfile('${p.id}')" style="cursor:pointer;">${initials(p.name)}</div>
+      <div class="avatar" onclick="event.stopPropagation(); openProfile('${p.id}')" style="cursor:pointer; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
       <div onclick="startConversation('${p.id}')" style="flex:1; cursor:pointer;">
         <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
         <div class="person-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || p.tagline || 'Say hello'}</div>
@@ -369,7 +373,7 @@ async function loadChats(){
     const waiting = c.last_sender_id && c.last_sender_id !== currentUser.id;
     return `
       <div class="person-card ${waiting ? 'waiting' : ''}" onclick="openChat('${c.id}','${otherId}')">
-        <div class="avatar">${initials(p.name)}</div>
+        <div class="avatar" style="${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
         <div style="flex:1;">
           <div class="person-name">${p.name} ${waiting ? '<span class="waiting-badge">New</span>' : ''}</div>
           <div class="person-sub">${c.message_count} messages</div>
@@ -398,17 +402,49 @@ async function renderProfileTab(){
 
   panel.innerHTML = `
     <div class="pf-head" style="margin-top:8px;">
-      <div class="pf-avatar" style="width:56px;height:56px;font-size:20px;">${initials(p.name)}</div>
+      <div class="pf-avatar" style="width:56px;height:56px;font-size:20px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
       <div>
         <div class="pf-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
         <div class="pf-sub">${[genderLabel, p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
+        <label class="photo-upload-label" for="avatarUpload">${p.avatar_url ? 'Change photo' : 'Add a photo'}</label>
+        <input type="file" id="avatarUpload" accept="image/*" style="display:none;" onchange="uploadAvatar(event)">
       </div>
     </div>
+    <div id="avatarErr" class="err" style="display:none;"></div>
     <div class="verify-badges" style="margin-bottom:10px;">${verificationBadges(p)}</div>
     ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
     ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
     ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
     <div class="info-cta-sub" style="margin-top:16px;">This is what other people see about you.</div>`;
+}
+
+async function uploadAvatar(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const errBox = document.getElementById('avatarErr');
+  errBox.style.display = 'none';
+
+  const ext = file.name.split('.').pop();
+  const path = `${currentUser.id}/avatar.${ext}`;
+
+  const { error: uploadError } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+  if(uploadError){
+    errBox.textContent = uploadError.message;
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
+  // cache-bust so the new photo shows immediately even though the URL path is the same
+  const freshUrl = urlData.publicUrl + '?t=' + Date.now();
+
+  const { error: updateError } = await sb.from('profiles').update({ avatar_url: freshUrl }).eq('id', currentUser.id);
+  if(updateError){
+    errBox.textContent = updateError.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  renderProfileTab();
 }
 
 function renderInfoTab(){
@@ -562,7 +598,7 @@ async function openProfile(userId){
   drawer.innerHTML = `
     <div class="drawer-handle"></div>
     <div class="pf-head">
-      <div class="pf-avatar">${initials(p.name)}</div>
+      <div class="pf-avatar" style="${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
       <div>
         <div class="pf-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
         <div class="pf-sub">${[p.gender ? (p.gender.toLowerCase()==='male'?'Male':p.gender.toLowerCase()==='female'?'Female':p.gender) : null, p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
@@ -596,7 +632,7 @@ async function openChat(conversationId, otherId){
   chatPanel.innerHTML = `
     <div class="chat-header">
       <div class="back" onclick="switchTab('chats')">&#8592;</div>
-      <div class="avatar" style="width:36px;height:36px;font-size:13px;">${initials(other.name)}</div>
+      <div class="avatar" style="width:36px;height:36px;font-size:13px; ${avatarBg(other)}">${other.avatar_url ? '' : initials(other.name)}</div>
       <div class="person-name">${other.name}</div>
       <div class="view-profile-link" onclick="openProfile('${other.id}')">View Profile</div>
     </div>
