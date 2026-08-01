@@ -94,6 +94,12 @@ select.report-select{ width:100%; border:1.5px solid var(--border); border-radiu
 textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13.5px; font-family:'Manrope',sans-serif; outline:none; resize:none; min-height:80px; }
 .report-cancel{ text-align:center; font-size:12.5px; color:var(--ink-soft); font-weight:600; margin-top:12px; cursor:pointer; }
 .photo-upload-label{ display:inline-block; font-size:11.5px; font-weight:700; color:var(--rose); cursor:pointer; margin-top:4px; }
+.pf-avatar-wrap{ position:relative; cursor:pointer; flex-shrink:0; }
+.pf-avatar-cam{
+  position:absolute; bottom:-3px; right:-3px; width:22px; height:22px; border-radius:50%;
+  background:var(--rose); color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:11px; border:2px solid var(--white);
+}
 .empty{ text-align:center; color:var(--ink-soft); font-size:13px; margin-top:40px; }
 .person-card.waiting{ background:var(--rose-soft); }
 .waiting-badge{
@@ -402,12 +408,15 @@ async function renderProfileTab(){
 
   panel.innerHTML = `
     <div class="pf-head" style="margin-top:8px;">
-      <div class="pf-avatar" style="width:56px;height:56px;font-size:20px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
+      <div class="pf-avatar-wrap" onclick="document.getElementById('avatarUpload').click()">
+        <div class="pf-avatar" style="width:56px;height:56px;font-size:20px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
+        <div class="pf-avatar-cam">&#128247;</div>
+        <input type="file" id="avatarUpload" accept="image/*" style="display:none;" onchange="uploadAvatar(event)">
+      </div>
       <div>
         <div class="pf-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
         <div class="pf-sub">${[genderLabel, p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
-        <label class="photo-upload-label" for="avatarUpload">${p.avatar_url ? 'Change photo' : 'Add a photo'}</label>
-        <input type="file" id="avatarUpload" accept="image/*" style="display:none;" onchange="uploadAvatar(event)">
+        <div class="photo-upload-label" onclick="document.getElementById('avatarUpload').click()">${p.avatar_url ? 'Change photo' : 'Add a photo'}</div>
       </div>
     </div>
     <div id="avatarErr" class="err" style="display:none;"></div>
@@ -457,29 +466,29 @@ function renderInfoTab(){
     <div class="info-card">
       <div class="info-num">1</div>
       <div>
-        <div class="info-card-title">One match a day</div>
-        <div class="info-card-text">No feed to scroll. Just one person, chosen for you, every day.</div>
+        <div class="info-card-title">Join an in-person meetup or be invited</div>
+        <div class="info-card-text">Get verified by attending a Plus 1 meetup, or by being invited by an existing member.</div>
       </div>
     </div>
     <div class="info-card">
       <div class="info-num">2</div>
+      <div>
+        <div class="info-card-title">One match per day</div>
+        <div class="info-card-text">No feed to scroll. Just one person, chosen for you, every day.</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-num">3</div>
       <div>
         <div class="info-card-title">Keep it or let it go</div>
         <div class="info-card-text">Decide the same day. If you let it go, your next match arrives tomorrow.</div>
       </div>
     </div>
     <div class="info-card">
-      <div class="info-num">3</div>
+      <div class="info-num">4</div>
       <div>
         <div class="info-card-title">Only 3 conversations at once</div>
         <div class="info-card-text">Want a 4th? You'll need to let one of your current 3 go first.</div>
-      </div>
-    </div>
-    <div class="info-card">
-      <div class="info-num">4</div>
-      <div>
-        <div class="info-card-title">Profiles unlock as you talk</div>
-        <div class="info-card-text">You start with the basics. Keep messaging to unlock more of who they are.</div>
       </div>
     </div>
     <a class="info-cta" href="plus1-pitch.pdf" target="_blank" rel="noopener">Read the full pitch deck</a>
