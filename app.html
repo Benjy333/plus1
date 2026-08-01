@@ -182,10 +182,12 @@ input:focus{ border-color:var(--rose); }
   <div class="tabs">
     <div class="tab active" data-tab="people" onclick="switchTab('people')">People</div>
     <div class="tab" data-tab="chats" onclick="switchTab('chats')">Chats</div>
+    <div class="tab" data-tab="profile" onclick="switchTab('profile')">Profile</div>
     <div class="tab" data-tab="info" onclick="switchTab('info')">Info</div>
   </div>
   <div class="panel active" id="panel-people"></div>
   <div class="panel" id="panel-chats"></div>
+  <div class="panel" id="panel-profile"></div>
   <div class="panel" id="panel-info"></div>
   <div class="panel" id="panel-chat" style="padding:0; display:none; flex-direction:column;"></div>
 
@@ -369,10 +371,33 @@ function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.getElementById('panel-people').classList.toggle('active', tab === 'people');
   document.getElementById('panel-chats').classList.toggle('active', tab === 'chats');
+  document.getElementById('panel-profile').classList.toggle('active', tab === 'profile');
   document.getElementById('panel-info').classList.toggle('active', tab === 'info');
   document.getElementById('panel-chat').style.display = 'none';
   if(tab === 'chats') loadChats();
   if(tab === 'info') renderInfoTab();
+  if(tab === 'profile') renderProfileTab();
+}
+
+async function renderProfileTab(){
+  const panel = document.getElementById('panel-profile');
+  const { data: p } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = p;
+  const genderLabel = p.gender ? (p.gender.toLowerCase()==='male'?'Male':p.gender.toLowerCase()==='female'?'Female':p.gender) : null;
+
+  panel.innerHTML = `
+    <div class="pf-head" style="margin-top:8px;">
+      <div class="pf-avatar" style="width:56px;height:56px;font-size:20px;">${initials(p.name)}</div>
+      <div>
+        <div class="pf-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
+        <div class="pf-sub">${[genderLabel, p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
+      </div>
+    </div>
+    <div class="verify-badges" style="margin-bottom:10px;">${verificationBadges(p)}</div>
+    ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
+    ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
+    ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
+    <div class="info-cta-sub" style="margin-top:16px;">This is what other people see about you.</div>`;
 }
 
 function renderInfoTab(){
