@@ -302,10 +302,13 @@ function verificationBadges(p){
     { key: 'id_verified', label: 'ID' },
     { key: 'meetup_verified', label: 'In person' },
   ];
-  return tiers.map(t => {
+  const badges = tiers.map(t => {
     const on = !!p[t.key];
     return `<span class="v-badge ${on ? 'on' : ''}">${on ? '&#9989;' : '&#9675;'} ${t.label}</span>`;
-  }).join('');
+  });
+  const referred = !!p.referred_by;
+  badges.push(`<span class="v-badge ${referred ? 'on' : ''}">${referred ? '&#9989;' : '&#9675;'} Referred</span>`);
+  return badges.join('');
 }
 
 async function startConversation(otherId){
@@ -402,7 +405,55 @@ function renderInfoTab(){
       </div>
     </div>
     <a class="info-cta" href="plus1-pitch.pdf" target="_blank" rel="noopener">Read the full pitch deck</a>
-    <div class="info-cta-sub">Problem, market, business model, and go-to-market plan</div>`;
+    <div class="info-cta-sub">Problem, market, business model, and go-to-market plan</div>
+
+    <div class="pf-label" style="margin-top:24px;">Refer friends</div>
+    <div class="info-card-text" style="margin-bottom:10px;">You can refer up to 3 people. Once they sign up with the email you add, they'll show as "Referred" verified.</div>
+    <div id="referralList"></div>
+    <div id="referralForm" style="display:flex; gap:8px; margin-top:8px;">
+      <input type="email" id="referralEmailInput" placeholder="friend@email.com" style="flex:1; border:1.5px solid var(--border); border-radius:12px; padding:11px 13px; font-size:13px; font-family:'Manrope',sans-serif; outline:none;">
+      <button class="send" onclick="addReferral()" style="width:auto; padding:0 16px; border-radius:12px;">Add</button>
+    </div>
+    <div class="err" id="referralErr" style="display:none;"></div>`;
+  loadReferrals();
+}
+
+async function loadReferrals(){
+  const { data: referrals } = await sb.from('referrals').select('*').eq('referrer_id', currentUser.id).order('created_at');
+  const list = document.getElementById('referralList');
+  const form = document.getElementById('referralForm');
+  if(!list) return;
+
+  list.innerHTML = (referrals || []).map(r => `
+    <div class="info-card" style="padding:10px 14px; margin-bottom:6px;">
+      <div style="flex:1;">
+        <div class="info-card-title" style="margin-bottom:0;">${r.referred_email}</div>
+        <div class="info-card-text">${r.status === 'joined' ? '&#9989; Joined' : 'Invited, waiting for them to sign up'}</div>
+      </div>
+    </div>`).join('');
+
+  const count = (referrals || []).length;
+  if(count >= 3 && form) form.style.display = 'none';
+}
+
+async function addReferral(){
+  const input = document.getElementById('referralEmailInput');
+  const errBox = document.getElementById('referralErr');
+  const email = input.value.trim();
+  errBox.style.display = 'none';
+  if(!email || !email.includes('@')){
+    errBox.textContent = 'Enter a valid email.';
+    errBox.style.display = 'block';
+    return;
+  }
+  const { error } = await sb.from('referrals').insert({ referrer_id: currentUser.id, referred_email: email });
+  if(error){
+    errBox.textContent = error.message.includes('up to 3') ? 'You\'ve already referred 3 people.' : error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  input.value = '';
+  loadReferrals();
 }
 
 // ---------- VIEW PROFILE ----------
