@@ -337,15 +337,44 @@ async function loadToday(){
     return;
   }
 
-  if(match.decision !== 'pending'){
+  const isUserA = match.user_a === currentUser.id;
+  const myDecision = isUserA ? match.user_a_decision : match.user_b_decision;
+  const otherId = isUserA ? match.user_b : match.user_a;
+
+  if(match.status === 'declined'){
+    panel.innerHTML = `<div class="empty">See you tomorrow.<br>Your next match unlocks then.</div>`;
+    return;
+  }
+
+  if(match.status === 'matched'){
+    await sb.rpc('finalize_match', { match_id: match.id }); // safe no-op if already finalized
+    panel.innerHTML = `<div class="empty">&#9989; It's a match!<br>Added to your chats — say hello.</div>`;
+    return;
+  }
+
+  const { data: p } = await sb.from('profiles').select('*').eq('id', otherId).single();
+
+  if(myDecision === 'yes'){
+    // I've voted yes, waiting on them
     panel.innerHTML = `
-      <div class="empty">
-        ${match.decision === 'kept' ? '&#9989; Added to your chats.<br>Say hello!' : 'See you tomorrow.<br>Your next match unlocks then.'}
+      <div class="match-eyebrow">Today's Match</div>
+      <div class="today-card">
+        <div class="today-photo" style="${avatarBg(p) || 'background:var(--rose);'}">
+          ${p.avatar_url ? '' : `<div class="today-initial">${initials(p.name)}</div>`}
+          <div class="today-overlay">
+            <div class="today-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
+            <div class="today-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
+          </div>
+        </div>
+        <div style="padding:16px; text-align:center;">
+          <div class="v-badge on" style="font-size:12px; padding:6px 12px;">You voted Yes</div>
+          <div class="info-cta-sub" style="margin-top:8px;">Waiting for ${p.name} to confirm before it's a match.</div>
+        </div>
       </div>`;
     return;
   }
 
-  const { data: p } = await sb.from('profiles').select('*').eq('id', match.matched_user_id).single();
+  // myDecision === 'pending' — show the decision card
   panel.innerHTML = `
     <div class="match-eyebrow">Today's Match</div>
     <div class="today-card">
@@ -357,41 +386,45 @@ async function loadToday(){
         </div>
       </div>
       <div class="today-actions">
-        <button class="btn btn-ghost" onclick="decideMatch('${match.id}', 'passed')">Let Go</button>
-        <button class="btn" onclick="decideMatch('${match.id}', 'kept', '${p.id}')">Keep</button>
+        <button class="btn btn-ghost" onclick="decideMatch('${match.id}', 'no')">Let Go</button>
+        <button class="btn" onclick="decideMatch('${match.id}', 'yes')">Keep</button>
       </div>
     </div>`;
 }
 
-async function decideMatch(matchId, decision, matchedUserId){
-  if(decision === 'passed'){
-    await sb.from('daily_matches').update({ decision: 'passed', decided_at: new Date().toISOString() }).eq('id', matchId);
+async function decideMatch(matchId, decision){
+  if(decision === 'no'){
+    await sb.rpc('vote_match', { match_id: matchId, decision: 'no' });
     loadToday();
     return;
   }
 
-  // decision === 'kept' — check the 3-conversation cap first
+  const { data, error } = await sb.rpc('vote_match', { match_id: matchId, decision: 'yes' });
+  if(error){ alert(error.message); return; }
+  const result = data[0];
+
+  if(!result.mutual){
+    // they haven't voted yes yet — just show the waiting state
+    loadToday();
+    return;
+  }
+
+  // mutual! check my conversation cap before finalizing
   const { data: activeConvos } = await sb.from('conversations')
     .select('*').eq('status', 'active')
     .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
 
   if(activeConvos && activeConvos.length >= 3){
-    openSwapModal(matchId, matchedUserId, activeConvos);
+    openSwapModal(matchId, activeConvos);
     return;
   }
 
-  await finalizeKeep(matchId, matchedUserId);
-}
-
-async function finalizeKeep(matchId, matchedUserId){
-  const { error: convoError } = await sb.from('conversations').insert({ user_a: currentUser.id, user_b: matchedUserId });
-  if(convoError){ alert(convoError.message); return; }
-  await sb.from('daily_matches').update({ decision: 'kept', decided_at: new Date().toISOString() }).eq('id', matchId);
+  await sb.rpc('finalize_match', { match_id: matchId });
   loadToday();
   loadChats();
 }
 
-async function openSwapModal(matchId, matchedUserId, activeConvos){
+async function openSwapModal(matchId, activeConvos){
   const otherIds = activeConvos.map(c => c.user_a === currentUser.id ? c.user_b : c.user_a);
   const { data: profiles } = await sb.from('profiles').select('*').in('id', otherIds);
   const profileMap = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
@@ -407,7 +440,7 @@ async function openSwapModal(matchId, matchedUserId, activeConvos){
         return `<div class="swap-row">
           <div class="avatar" style="width:40px;height:40px;font-size:14px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
           <div style="flex:1;"><div class="person-name">${p.name}</div></div>
-          <div class="swap-let-go" onclick="swapOut('${c.id}', '${matchId}', '${matchedUserId}')">Let Go</div>
+          <div class="swap-let-go" onclick="swapOut('${c.id}', '${matchId}')">Let Go</div>
         </div>`;
       }).join('')}
       <div class="report-cancel" onclick="closeReportModal()">Never mind, keep my 3</div>
@@ -415,11 +448,14 @@ async function openSwapModal(matchId, matchedUserId, activeConvos){
   overlay.classList.add('active');
 }
 
-async function swapOut(conversationId, matchId, matchedUserId){
+async function swapOut(conversationId, matchId){
   await sb.from('conversations').update({ status: 'dropped' }).eq('id', conversationId);
   closeReportModal();
-  await finalizeKeep(matchId, matchedUserId);
+  await sb.rpc('finalize_match', { match_id: matchId });
+  loadToday();
+  loadChats();
 }
+
 
 function verificationBadges(p){
   const tiers = [
