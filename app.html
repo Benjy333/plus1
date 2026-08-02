@@ -496,8 +496,9 @@ async function loadAdmin(){
 
   panel.innerHTML = `
     <div class="pf-label" style="margin:8px 0 12px;">${users.length} total users</div>
-    <button class="btn" style="margin-bottom:16px;" onclick="simulateNextDay()">&#9200; Simulate Next Day</button>
-    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="resetMyData()">&#128465; Reset My Matches &amp; Chats (testing)</button>
+    <button class="btn" style="margin-bottom:16px;" onclick="simulateNextDay()">&#9200; Simulate Next Day (everyone)</button>
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="resetMyData()">&#128465; Reset My Matches &amp; Chats</button>
+    <button class="btn btn-ghost" style="margin-bottom:16px; color:var(--rose);" onclick="resetAllData()">&#9888; Reset EVERYONE's Matches &amp; Chats</button>
     <div class="err" id="simulateErr" style="display:none;"></div>
     ${users.map(p => `
       <div class="info-card" style="align-items:center;">
@@ -535,6 +536,21 @@ async function resetMyData(){
     return;
   }
   alert('Your matches and conversations have been cleared.');
+  loadToday();
+  loadChats();
+}
+
+async function resetAllData(){
+  if(!confirm('This deletes EVERY user\'s match history and conversations — not just yours. This cannot be undone. Continue?')) return;
+  const errBox = document.getElementById('simulateErr');
+  errBox.style.display = 'none';
+  const { error } = await sb.rpc('admin_reset_all_data');
+  if(error){
+    errBox.textContent = error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  alert('Every user\'s matches and conversations have been cleared. Everyone will get a fresh match next time they open Today.');
   loadToday();
   loadChats();
 }
