@@ -497,6 +497,7 @@ async function loadAdmin(){
   panel.innerHTML = `
     <div class="pf-label" style="margin:8px 0 12px;">${users.length} total users</div>
     <button class="btn" style="margin-bottom:16px;" onclick="simulateNextDay()">&#9200; Simulate Next Day</button>
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="resetMyData()">&#128465; Reset My Matches &amp; Chats (testing)</button>
     <div class="err" id="simulateErr" style="display:none;"></div>
     ${users.map(p => `
       <div class="info-card" style="align-items:center;">
@@ -521,6 +522,21 @@ async function simulateNextDay(){
   }
   alert('Done — everyone\'s daily match has been reset. Check the Today tab.');
   loadToday();
+}
+
+async function resetMyData(){
+  if(!confirm('This deletes all your match history and conversations (including message history). Continue?')) return;
+  const errBox = document.getElementById('simulateErr');
+  errBox.style.display = 'none';
+  const { error } = await sb.rpc('admin_reset_my_matches');
+  if(error){
+    errBox.textContent = error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  alert('Your matches and conversations have been cleared.');
+  loadToday();
+  loadChats();
 }
 
 async function renderProfileTab(){
