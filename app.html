@@ -496,6 +496,8 @@ async function loadAdmin(){
 
   panel.innerHTML = `
     <div class="pf-label" style="margin:8px 0 12px;">${users.length} total users</div>
+    <button class="btn" style="margin-bottom:16px;" onclick="simulateNextDay()">&#9200; Simulate Next Day</button>
+    <div class="err" id="simulateErr" style="display:none;"></div>
     ${users.map(p => `
       <div class="info-card" style="align-items:center;">
         <div class="avatar" style="width:44px;height:44px;font-size:15px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
@@ -506,6 +508,19 @@ async function loadAdmin(){
         </div>
       </div>`).join('')}
     <div class="info-cta-sub" style="margin-top:10px;">Emails aren't shown here — view those in Supabase's Authentication tab. Toggle verification tiers in Table Editor > profiles.</div>`;
+}
+
+async function simulateNextDay(){
+  const errBox = document.getElementById('simulateErr');
+  errBox.style.display = 'none';
+  const { error } = await sb.rpc('admin_simulate_next_day');
+  if(error){
+    errBox.textContent = error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  alert('Done — everyone\'s daily match has been reset. Check the Today tab.');
+  loadToday();
 }
 
 async function renderProfileTab(){
