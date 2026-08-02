@@ -94,6 +94,20 @@ select.report-select{ width:100%; border:1.5px solid var(--border); border-radiu
 textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:13.5px; font-family:'Manrope',sans-serif; outline:none; resize:none; min-height:80px; }
 .report-cancel{ text-align:center; font-size:12.5px; color:var(--ink-soft); font-weight:600; margin-top:12px; cursor:pointer; }
 .photo-upload-label{ display:inline-block; font-size:11.5px; font-weight:700; color:var(--rose); cursor:pointer; margin-top:4px; }
+.match-eyebrow{ font-size:12px; font-weight:700; color:var(--ink-soft); margin:10px 2px 12px; }
+.today-card{ background:var(--white); border-radius:24px; box-shadow:0 10px 30px rgba(31,32,36,0.07); overflow:hidden; }
+.today-photo{ height:220px; position:relative; display:flex; align-items:flex-end; padding:18px; background-size:cover; background-position:center; }
+.today-photo::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%); }
+.today-initial{ position:absolute; top:50%; left:50%; transform:translate(-50%,-58%); font-weight:800; font-size:60px; color:rgba(255,255,255,0.55); }
+.today-overlay{ position:relative; z-index:2; color:#fff; }
+.today-name{ font-weight:800; font-size:20px; }
+.today-sub{ font-size:12.5px; font-weight:500; opacity:0.9; margin-top:2px; }
+.today-actions{ display:flex; gap:10px; padding:16px; }
+.today-actions .btn{ margin-top:0; width:auto; flex:1; }
+.btn-ghost{ background:var(--paper); color:var(--ink); }
+.swap-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.swap-row:last-of-type{ border-bottom:none; }
+.swap-let-go{ font-size:12px; font-weight:700; color:var(--rose); background:var(--rose-soft); padding:8px 12px; border-radius:999px; cursor:pointer; }
 .pf-avatar-wrap{ position:relative; cursor:pointer; flex-shrink:0; }
 .pf-avatar-cam{
   position:absolute; bottom:-3px; right:-3px; width:22px; height:22px; border-radius:50%;
@@ -196,15 +210,17 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
     <div class="signout" id="signOutBtn">Sign out</div>
   </div>
   <div class="tabs">
-    <div class="tab active" data-tab="people" onclick="switchTab('people')">People</div>
+    <div class="tab active" data-tab="today" onclick="switchTab('today')">Today</div>
     <div class="tab" data-tab="chats" onclick="switchTab('chats')">Chats</div>
-    <div class="tab" data-tab="profile" onclick="switchTab('profile')">Profile</div>
+    <div class="tab" data-tab="profile" onclick="switchTab('profile')">My Profile</div>
     <div class="tab" data-tab="info" onclick="switchTab('info')">Info</div>
+    <div class="tab" data-tab="admin" id="adminTab" onclick="switchTab('admin')" style="display:none;">Admin</div>
   </div>
-  <div class="panel active" id="panel-people"></div>
+  <div class="panel active" id="panel-today"></div>
   <div class="panel" id="panel-chats"></div>
   <div class="panel" id="panel-profile"></div>
   <div class="panel" id="panel-info"></div>
+  <div class="panel" id="panel-admin"></div>
   <div class="panel" id="panel-chat" style="padding:0; display:none; flex-direction:column;"></div>
 
   <div class="overlay" id="profileOverlay" onclick="closeProfile()"></div>
@@ -301,27 +317,108 @@ async function onLoggedIn(){
   currentProfile = profile;
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('app').classList.add('active');
-  loadPeople();
+  if(currentProfile && currentProfile.is_admin) document.getElementById('adminTab').style.display = 'block';
+  loadToday();
   loadChats();
 }
 
-// ---------- PEOPLE TAB ----------
-async function loadPeople(){
-  const panel = document.getElementById('panel-people');
-  const { data: people, error } = await sb.from('profiles').select('*').neq('id', currentUser.id);
-  if(error || !people || people.length === 0){
-    panel.innerHTML = `<div class="empty">No one else has signed up yet.<br>Invite a friend to test messaging with you!</div>`;
+// ---------- TODAY TAB (daily match) ----------
+async function loadToday(){
+  const panel = document.getElementById('panel-today');
+  panel.innerHTML = `<div class="empty">Finding today's match...</div>`;
+
+  const { data: match, error } = await sb.rpc('get_or_create_daily_match');
+  if(error){
+    panel.innerHTML = `<div class="empty">Something went wrong loading today's match.<br>${error.message}</div>`;
     return;
   }
-  panel.innerHTML = people.map(p => `
-    <div class="person-card">
-      <div class="avatar" onclick="event.stopPropagation(); openProfile('${p.id}')" style="cursor:pointer; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
-      <div onclick="startConversation('${p.id}')" style="flex:1; cursor:pointer;">
-        <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
-        <div class="person-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || p.tagline || 'Say hello'}</div>
-        <div class="verify-badges">${verificationBadges(p)}</div>
+  if(!match){
+    panel.innerHTML = `<div class="empty">No new matches available right now.<br>Invite more people to Plus 1!</div>`;
+    return;
+  }
+
+  if(match.decision !== 'pending'){
+    panel.innerHTML = `
+      <div class="empty">
+        ${match.decision === 'kept' ? '&#9989; Added to your chats.<br>Say hello!' : 'See you tomorrow.<br>Your next match unlocks then.'}
+      </div>`;
+    return;
+  }
+
+  const { data: p } = await sb.from('profiles').select('*').eq('id', match.matched_user_id).single();
+  panel.innerHTML = `
+    <div class="match-eyebrow">Today's Match</div>
+    <div class="today-card">
+      <div class="today-photo" style="${avatarBg(p) || 'background:var(--rose);'}">
+        ${p.avatar_url ? '' : `<div class="today-initial">${initials(p.name)}</div>`}
+        <div class="today-overlay">
+          <div class="today-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
+          <div class="today-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
+        </div>
       </div>
-    </div>`).join('');
+      <div class="today-actions">
+        <button class="btn btn-ghost" onclick="decideMatch('${match.id}', 'passed')">Let Go</button>
+        <button class="btn" onclick="decideMatch('${match.id}', 'kept', '${p.id}')">Keep</button>
+      </div>
+    </div>`;
+}
+
+async function decideMatch(matchId, decision, matchedUserId){
+  if(decision === 'passed'){
+    await sb.from('daily_matches').update({ decision: 'passed', decided_at: new Date().toISOString() }).eq('id', matchId);
+    loadToday();
+    return;
+  }
+
+  // decision === 'kept' — check the 3-conversation cap first
+  const { data: activeConvos } = await sb.from('conversations')
+    .select('*').eq('status', 'active')
+    .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+
+  if(activeConvos && activeConvos.length >= 3){
+    openSwapModal(matchId, matchedUserId, activeConvos);
+    return;
+  }
+
+  await finalizeKeep(matchId, matchedUserId);
+}
+
+async function finalizeKeep(matchId, matchedUserId){
+  const { error: convoError } = await sb.from('conversations').insert({ user_a: currentUser.id, user_b: matchedUserId });
+  if(convoError){ alert(convoError.message); return; }
+  await sb.from('daily_matches').update({ decision: 'kept', decided_at: new Date().toISOString() }).eq('id', matchId);
+  loadToday();
+  loadChats();
+}
+
+async function openSwapModal(matchId, matchedUserId, activeConvos){
+  const otherIds = activeConvos.map(c => c.user_a === currentUser.id ? c.user_b : c.user_a);
+  const { data: profiles } = await sb.from('profiles').select('*').in('id', otherIds);
+  const profileMap = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
+
+  const overlay = document.getElementById('reportOverlay');
+  overlay.innerHTML = `
+    <div class="report-modal">
+      <h3>Your 3 spots are full</h3>
+      <div class="sub">Let one conversation go to make room for your new match.</div>
+      ${activeConvos.map(c => {
+        const otherId = c.user_a === currentUser.id ? c.user_b : c.user_a;
+        const p = profileMap[otherId] || { name: 'Unknown' };
+        return `<div class="swap-row">
+          <div class="avatar" style="width:40px;height:40px;font-size:14px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
+          <div style="flex:1;"><div class="person-name">${p.name}</div></div>
+          <div class="swap-let-go" onclick="swapOut('${c.id}', '${matchId}', '${matchedUserId}')">Let Go</div>
+        </div>`;
+      }).join('')}
+      <div class="report-cancel" onclick="closeReportModal()">Never mind, keep my 3</div>
+    </div>`;
+  overlay.classList.add('active');
+}
+
+async function swapOut(conversationId, matchId, matchedUserId){
+  await sb.from('conversations').update({ status: 'dropped' }).eq('id', conversationId);
+  closeReportModal();
+  await finalizeKeep(matchId, matchedUserId);
 }
 
 function verificationBadges(p){
@@ -339,34 +436,17 @@ function verificationBadges(p){
   return badges.join('');
 }
 
-async function startConversation(otherId){
-  // check for an existing conversation between these two people
-  const { data: existing } = await sb.from('conversations')
-    .select('*')
-    .or(`and(user_a.eq.${currentUser.id},user_b.eq.${otherId}),and(user_a.eq.${otherId},user_b.eq.${currentUser.id})`)
-    .maybeSingle();
-
-  let convo = existing;
-  if(!convo){
-    const { data: created, error } = await sb.from('conversations')
-      .insert({ user_a: currentUser.id, user_b: otherId })
-      .select().single();
-    if(error){ alert(error.message); return; }
-    convo = created;
-  }
-  openChat(convo.id, otherId);
-}
-
 // ---------- CHATS TAB ----------
 async function loadChats(){
   const panel = document.getElementById('panel-chats');
   const { data: convos } = await sb.from('conversations')
     .select('*')
+    .eq('status', 'active')
     .or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`)
     .order('last_message_at', { ascending: false });
 
   if(!convos || convos.length === 0){
-    panel.innerHTML = `<div class="empty">No conversations yet.<br>Go to People to say hello.</div>`;
+    panel.innerHTML = `<div class="empty">No conversations yet.<br>Check Today for your daily match.</div>`;
     return;
   }
   const otherIds = convos.map(c => c.user_a === currentUser.id ? c.user_b : c.user_a);
@@ -390,14 +470,42 @@ async function loadChats(){
 
 function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.getElementById('panel-people').classList.toggle('active', tab === 'people');
+  document.getElementById('panel-today').classList.toggle('active', tab === 'today');
   document.getElementById('panel-chats').classList.toggle('active', tab === 'chats');
   document.getElementById('panel-profile').classList.toggle('active', tab === 'profile');
   document.getElementById('panel-info').classList.toggle('active', tab === 'info');
+  document.getElementById('panel-admin').classList.toggle('active', tab === 'admin');
   document.getElementById('panel-chat').style.display = 'none';
+  if(tab === 'today') loadToday();
   if(tab === 'chats') loadChats();
   if(tab === 'info') renderInfoTab();
   if(tab === 'profile') renderProfileTab();
+  if(tab === 'admin') loadAdmin();
+}
+
+// ---------- ADMIN TAB (developer-only view of all users) ----------
+async function loadAdmin(){
+  const panel = document.getElementById('panel-admin');
+  panel.innerHTML = `<div class="empty">Loading users...</div>`;
+
+  const { data: users, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+  if(error){
+    panel.innerHTML = `<div class="empty">${error.message}</div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="pf-label" style="margin:8px 0 12px;">${users.length} total users</div>
+    ${users.map(p => `
+      <div class="info-card" style="align-items:center;">
+        <div class="avatar" style="width:44px;height:44px;font-size:15px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
+        <div style="flex:1;">
+          <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.is_admin ? '<span class="v-badge on">Admin</span>' : ''}</div>
+          <div class="person-sub">${[p.gender, p.profession, p.suburb].filter(Boolean).join(' · ') || 'No bio yet'}</div>
+          <div class="verify-badges">${verificationBadges(p)}</div>
+        </div>
+      </div>`).join('')}
+    <div class="info-cta-sub" style="margin-top:10px;">Emails aren't shown here — view those in Supabase's Authentication tab. Toggle verification tiers in Table Editor > profiles.</div>`;
 }
 
 async function renderProfileTab(){
@@ -631,7 +739,7 @@ function closeProfile(){
 // ---------- CHAT SCREEN ----------
 async function openChat(conversationId, otherId){
   activeConversation = conversationId;
-  document.getElementById('panel-people').classList.remove('active');
+  document.getElementById('panel-today').classList.remove('active');
   document.getElementById('panel-chats').classList.remove('active');
   const chatPanel = document.getElementById('panel-chat');
   chatPanel.style.display = 'flex';
