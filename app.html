@@ -540,7 +540,7 @@ async function loadAdmin(){
       <div class="info-card" style="align-items:center;">
         <div class="avatar" style="width:44px;height:44px;font-size:15px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
         <div style="flex:1;">
-          <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.is_admin ? '<span class="v-badge on">Admin</span>' : ''} ${p.is_test_account ? '<span class="v-badge">Test</span>' : ''}</div>
+          <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.is_admin ? '<span class="v-badge on">Admin</span>' : ''} ${p.is_test_account ? '<span class="v-badge on">&#9989; Test</span>' : ''}</div>
           <div class="person-sub">${[p.gender, p.profession, p.suburb].filter(Boolean).join(' · ') || 'No bio yet'}</div>
           <div class="verify-badges">${verificationBadges(p)}</div>
         </div>
@@ -553,7 +553,10 @@ async function loginAsTestUser(email, name){
   if(!confirm(`Switch to ${name}'s account for testing? You'll need to sign back in with your own email afterward to return here.`)) return;
   await sb.auth.signOut();
   const { error } = await sb.auth.signInWithPassword({ email, password: 'plus1test123' });
-  if(error){ alert(error.message); return; }
+  if(error){
+    alert(`Login failed for ${email}\n\nMessage: ${error.message || '(none)'}\nStatus: ${error.status || '(none)'}\nName: ${error.name || '(none)'}`);
+    return;
+  }
   location.reload();
 }
 
