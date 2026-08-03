@@ -368,7 +368,8 @@ async function loadToday(){
         </div>
         <div style="padding:16px; text-align:center;">
           <div class="v-badge on" style="font-size:12px; padding:6px 12px;">You voted Yes</div>
-          <div class="info-cta-sub" style="margin-top:8px;">Waiting for ${p.name} to confirm before it's a match.</div>
+          <div class="info-cta-sub" style="margin-top:8px; margin-bottom:12px;">Waiting for ${p.name} to confirm before it's a match.</div>
+          <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="decideMatch('${match.id}', 'no')">Change my mind — Let Go instead</div>
         </div>
       </div>`;
     return;
@@ -546,7 +547,40 @@ async function loadAdmin(){
         </div>
         ${p.is_test_account && p.test_login_email ? `<div class="swap-let-go" onclick="loginAsTestUser('${p.test_login_email}', '${p.name}')">Log in as</div>` : ''}
       </div>`).join('')}
-    <div class="info-cta-sub" style="margin-top:10px;">Emails aren't shown here — view those in Supabase's Authentication tab. Toggle verification tiers in Table Editor > profiles.</div>`;
+    <div class="info-cta-sub" style="margin-top:10px;">Emails aren't shown here — view those in Supabase's Authentication tab. Toggle verification tiers in Table Editor > profiles.</div>
+
+    <div class="pf-label" style="margin-top:26px;">Match History</div>
+    <div id="matchHistoryList"><div class="empty">Loading match history...</div></div>`;
+
+  loadMatchHistory();
+}
+
+async function loadMatchHistory(){
+  const el = document.getElementById('matchHistoryList');
+  const { data: matches, error } = await sb.rpc('admin_get_all_matches');
+  if(error){
+    el.innerHTML = `<div class="empty">${error.message}</div>`;
+    return;
+  }
+  if(!matches || matches.length === 0){
+    el.innerHTML = `<div class="empty">No matches yet.</div>`;
+    return;
+  }
+
+  const statusLabel = { pending: 'Pending', matched: '&#9989; Matched', declined: 'Declined' };
+  const decisionLabel = { pending: 'Pending', yes: '&#9989; Yes', no: 'No' };
+
+  el.innerHTML = matches.map(m => `
+    <div class="info-card" style="align-items:flex-start;">
+      <div style="flex:1;">
+        <div class="person-name">${m.user_a_name} &harr; ${m.user_b_name} <span class="v-badge ${m.status==='matched'?'on':''}">${statusLabel[m.status] || m.status}</span></div>
+        <div class="person-sub" style="margin-top:4px;">${new Date(m.created_at).toLocaleString()} &middot; ${m.match_date}</div>
+        <div class="verify-badges" style="margin-top:6px;">
+          <span class="v-badge ${m.user_a_decision==='yes'?'on':''}">${m.user_a_name}: ${decisionLabel[m.user_a_decision] || m.user_a_decision}</span>
+          <span class="v-badge ${m.user_b_decision==='yes'?'on':''}">${m.user_b_name}: ${decisionLabel[m.user_b_decision] || m.user_b_decision}</span>
+        </div>
+      </div>
+    </div>`).join('');
 }
 
 async function loginAsTestUser(email, name){
@@ -746,6 +780,11 @@ async function addReferral(){
     errBox.style.display = 'block';
     return;
   }
+
+  // fire off the invite email — don't block the UI if this fails
+  sb.functions.invoke('send-referral-email', {
+    body: { referredEmail: email, referrerName: currentProfile.name }
+  }).catch(() => {});
   input.value = '';
   loadReferrals();
 }
