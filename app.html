@@ -550,27 +550,51 @@ async function loadAdmin(){
     <div class="info-cta-sub" style="margin-top:10px;">Emails aren't shown here — view those in Supabase's Authentication tab. Toggle verification tiers in Table Editor > profiles.</div>
 
     <div class="pf-label" style="margin-top:26px;">Match History</div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+      <input type="date" id="matchHistoryDate" style="border:1.5px solid var(--border); border-radius:12px; padding:10px 12px; font-size:13px; font-family:'Manrope',sans-serif;" onchange="renderMatchHistory()">
+      <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="document.getElementById('matchHistoryDate').value=''; renderMatchHistory();">Show all days</div>
+    </div>
     <div id="matchHistoryList"><div class="empty">Loading match history...</div></div>`;
 
   loadMatchHistory();
 }
 
+let allMatches = [];
+
 async function loadMatchHistory(){
-  const el = document.getElementById('matchHistoryList');
   const { data: matches, error } = await sb.rpc('admin_get_all_matches');
   if(error){
-    el.innerHTML = `<div class="empty">${error.message}</div>`;
+    document.getElementById('matchHistoryList').innerHTML = `<div class="empty">${error.message}</div>`;
     return;
   }
-  if(!matches || matches.length === 0){
-    el.innerHTML = `<div class="empty">No matches yet.</div>`;
+  allMatches = matches || [];
+  // default the date filter to today
+  const dateInput = document.getElementById('matchHistoryDate');
+  if(dateInput && !dateInput.value){
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+  renderMatchHistory();
+}
+
+function renderMatchHistory(){
+  const el = document.getElementById('matchHistoryList');
+  const dateInput = document.getElementById('matchHistoryDate');
+  const filterDate = dateInput ? dateInput.value : '';
+
+  const matches = filterDate
+    ? allMatches.filter(m => m.match_date === filterDate)
+    : allMatches;
+
+  if(matches.length === 0){
+    el.innerHTML = `<div class="empty">${filterDate ? 'No matches on this day.' : 'No matches yet.'}</div>`;
     return;
   }
 
   const statusLabel = { pending: 'Pending', matched: '&#9989; Matched', declined: 'Declined' };
   const decisionLabel = { pending: 'Pending', yes: '&#9989; Yes', no: 'No' };
 
-  el.innerHTML = matches.map(m => `
+  el.innerHTML = `<div class="info-cta-sub" style="margin-bottom:10px;">${matches.length} match${matches.length===1?'':'es'}${filterDate ? ' on ' + filterDate : ''}</div>` +
+    matches.map(m => `
     <div class="info-card" style="align-items:flex-start;">
       <div style="flex:1;">
         <div class="person-name">${m.user_a_name} &harr; ${m.user_b_name} <span class="v-badge ${m.status==='matched'?'on':''}">${statusLabel[m.status] || m.status}</span></div>
