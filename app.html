@@ -740,7 +740,74 @@ async function renderProfileTab(){
     ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
     ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
     ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
+    <div class="photo-upload-label" style="margin-top:14px;" onclick="showEditProfile()">Edit profile</div>
+    <div id="editProfileForm"></div>
     <div class="info-cta-sub" style="margin-top:16px;">This is what other people see about you.</div>`;
+}
+
+function showEditProfile(){
+  const p = currentProfile;
+  const form = document.getElementById('editProfileForm');
+  form.innerHTML = `
+    <div style="margin-top:12px;">
+      <label>Name</label>
+      <input type="text" id="editName" value="${p.name || ''}">
+      <label>Age</label>
+      <input type="number" id="editAge" value="${p.age || ''}" min="18" max="99">
+      <label>Gender</label>
+      <select id="editGender" style="width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:14px; font-family:'Manrope',sans-serif; outline:none; background:#fff;">
+        <option value="male" ${p.gender && p.gender.toLowerCase()==='male' ? 'selected' : ''}>Male</option>
+        <option value="female" ${p.gender && p.gender.toLowerCase()==='female' ? 'selected' : ''}>Female</option>
+      </select>
+      <label>Brisbane suburb</label>
+      <input type="text" id="editSuburb" value="${p.suburb || ''}">
+      <label>Profession</label>
+      <input type="text" id="editProfession" value="${p.profession || ''}">
+      <label>Interests</label>
+      <input type="text" id="editInterests" value="${p.interests || ''}">
+      <label>About</label>
+      <input type="text" id="editBio" value="${p.bio || ''}">
+      <div class="err" id="editProfileErr" style="display:none;"></div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-ghost" style="margin-top:0;" onclick="cancelEditProfile()">Cancel</button>
+        <button class="btn" style="margin-top:0;" onclick="saveEditProfile()">Save changes</button>
+      </div>
+    </div>`;
+}
+
+function cancelEditProfile(){
+  document.getElementById('editProfileForm').innerHTML = '';
+}
+
+async function saveEditProfile(){
+  const errBox = document.getElementById('editProfileErr');
+  errBox.style.display = 'none';
+
+  const name = document.getElementById('editName').value.trim();
+  const age = document.getElementById('editAge').value.trim();
+  const gender = document.getElementById('editGender').value;
+  const suburb = document.getElementById('editSuburb').value.trim();
+  const profession = document.getElementById('editProfession').value.trim();
+  const interests = document.getElementById('editInterests').value.trim();
+  const bio = document.getElementById('editBio').value.trim();
+
+  if(!name || !age || !suburb){
+    errBox.textContent = 'Name, age, and suburb are required.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const { error } = await sb.from('profiles').update({
+    name, age: parseInt(age), gender, suburb, profession, interests, bio
+  }).eq('id', currentUser.id);
+
+  if(error){
+    errBox.textContent = error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+
+  renderProfileTab();
 }
 
 async function uploadAvatar(event){
