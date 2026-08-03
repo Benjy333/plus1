@@ -632,12 +632,19 @@ function renderMatchHistory(){
     return;
   }
 
+  const statusLabel = { pending: 'Pending', matched: '&#9989; Matched', declined: 'Declined' };
+  const decisionLabel = { pending: 'Pending', yes: '&#9989; Yes', no: 'No' };
+
   el.innerHTML = `<div class="info-cta-sub" style="margin-bottom:10px;">${matches.length} pair${matches.length===1?'':'s'}${filterDate ? ' on ' + filterDate : ''}</div>` +
     matches.map(m => `
     <div class="info-card" style="align-items:flex-start;">
       <div style="flex:1;">
-        <div class="person-name">${m.user_a_name} &harr; ${m.user_b_name}</div>
+        <div class="person-name">${m.user_a_name} &harr; ${m.user_b_name} <span class="v-badge ${m.status==='matched'?'on':''}">${statusLabel[m.status] || m.status}</span></div>
         <div class="person-sub" style="margin-top:4px;">${new Date(m.created_at).toLocaleString()}</div>
+        <div class="verify-badges" style="margin-top:6px;">
+          <span class="v-badge ${m.user_a_decision==='yes'?'on':''}">${m.user_a_name}: ${decisionLabel[m.user_a_decision] || m.user_a_decision}</span>
+          <span class="v-badge ${m.user_b_decision==='yes'?'on':''}">${m.user_b_name}: ${decisionLabel[m.user_b_decision] || m.user_b_decision}</span>
+        </div>
       </div>
     </div>`).join('');
 }
