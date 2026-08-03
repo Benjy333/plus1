@@ -534,6 +534,7 @@ async function loadAdmin(){
   panel.innerHTML = `
     <div class="pf-label" style="margin:8px 0 12px;">${users.length} total users</div>
     <button class="btn" style="margin-bottom:16px;" onclick="simulateNextDay()">&#9200; Simulate Next Day (everyone)</button>
+    <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="generateAllMatches()">&#127919; Generate Today's Matches for Everyone</button>
     <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="resetMyData()">&#128465; Reset My Matches &amp; Chats</button>
     <button class="btn btn-ghost" style="margin-bottom:16px; color:var(--rose);" onclick="resetAllData()">&#9888; Reset EVERYONE's Matches &amp; Chats</button>
     <div class="err" id="simulateErr" style="display:none;"></div>
@@ -590,19 +591,12 @@ function renderMatchHistory(){
     return;
   }
 
-  const statusLabel = { pending: 'Pending', matched: '&#9989; Matched', declined: 'Declined' };
-  const decisionLabel = { pending: 'Pending', yes: '&#9989; Yes', no: 'No' };
-
-  el.innerHTML = `<div class="info-cta-sub" style="margin-bottom:10px;">${matches.length} match${matches.length===1?'':'es'}${filterDate ? ' on ' + filterDate : ''}</div>` +
+  el.innerHTML = `<div class="info-cta-sub" style="margin-bottom:10px;">${matches.length} pair${matches.length===1?'':'s'}${filterDate ? ' on ' + filterDate : ''}</div>` +
     matches.map(m => `
     <div class="info-card" style="align-items:flex-start;">
       <div style="flex:1;">
-        <div class="person-name">${m.user_a_name} &harr; ${m.user_b_name} <span class="v-badge ${m.status==='matched'?'on':''}">${statusLabel[m.status] || m.status}</span></div>
-        <div class="person-sub" style="margin-top:4px;">${new Date(m.created_at).toLocaleString()} &middot; ${m.match_date}</div>
-        <div class="verify-badges" style="margin-top:6px;">
-          <span class="v-badge ${m.user_a_decision==='yes'?'on':''}">${m.user_a_name}: ${decisionLabel[m.user_a_decision] || m.user_a_decision}</span>
-          <span class="v-badge ${m.user_b_decision==='yes'?'on':''}">${m.user_b_name}: ${decisionLabel[m.user_b_decision] || m.user_b_decision}</span>
-        </div>
+        <div class="person-name">${m.user_a_name} &harr; ${m.user_b_name}</div>
+        <div class="person-sub" style="margin-top:4px;">${new Date(m.created_at).toLocaleString()}</div>
       </div>
     </div>`).join('');
 }
@@ -616,6 +610,19 @@ async function loginAsTestUser(email, name){
     return;
   }
   location.reload();
+}
+
+async function generateAllMatches(){
+  const errBox = document.getElementById('simulateErr');
+  errBox.style.display = 'none';
+  const { data, error } = await sb.rpc('admin_generate_all_matches_for_today');
+  if(error){
+    errBox.textContent = error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+  alert(`Generated ${data} new match${data===1?'':'es'} for people who didn't have one yet today.`);
+  loadMatchHistory();
 }
 
 async function simulateNextDay(){
