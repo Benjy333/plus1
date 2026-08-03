@@ -394,6 +394,26 @@ async function loadToday(){
   const otherId = isUserA ? match.user_b : match.user_a;
 
   if(match.status === 'declined'){
+    if(myDecision === 'no'){
+      // I was the one who let this go — offer to reconsider
+      const { data: p } = await sb.from('profiles').select('*').eq('id', otherId).single();
+      panel.innerHTML = `
+        <div class="match-eyebrow">Today's Match</div>
+        <div class="today-card">
+          <div class="today-photo" style="${avatarBg(p) || 'background:var(--rose);'}">
+            ${p.avatar_url ? '' : `<div class="today-initial">${initials(p.name)}</div>`}
+            <div class="today-overlay">
+              <div class="today-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
+              <div class="today-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
+            </div>
+          </div>
+          <div style="padding:16px; text-align:center;">
+            <div class="info-cta-sub" style="margin-bottom:10px;">You let this one go.</div>
+            <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="decideMatch('${match.id}', 'yes')">Change my mind — Keep instead</div>
+          </div>
+        </div>`;
+      return;
+    }
     panel.innerHTML = `<div class="empty">See you tomorrow.<br>Your next match unlocks then.</div>`;
     return;
   }
