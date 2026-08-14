@@ -61,6 +61,8 @@ input:focus{ border-color:var(--rose); }
 
 /* app shell once logged in */
 .app{ display:none; width:100%; max-width:420px; height:88vh; background:var(--white); border-radius:28px; box-shadow:var(--shadow); overflow:hidden; display:none; flex-direction:column; }
+.waiting-screen{ display:none; }
+.waiting-screen.active{ display:block; }
 .app.active{ display:flex; }
 .topbar{ padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 .topbar .wordmark{ margin:0; font-size:18px; text-align:left; }
@@ -318,6 +320,40 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
   <div class="report-modal-overlay" id="reportOverlay"></div>
 </div>
 
+<!-- ========== WAITING FOR APPROVAL SCREEN ========== -->
+<div class="wrap waiting-screen" id="waitingScreen">
+  <div class="wordmark">
+    <img data-skin="acorn" src="acorn-logo-icon.png" alt="Acorn" style="height:38px; width:auto;">
+    <span data-skin="plus1">Plus<span>+1</span></span>
+    <span data-skin="acorn">Acorn<span> Dating</span></span>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:40px; margin-bottom:10px;">&#8987;</div>
+    <h2 style="margin-bottom:10px;">You're on the list!</h2>
+    <div class="pf-text" style="color:var(--ink-soft); margin-bottom:0;">
+      We manually review every member to keep things safe and balanced. We'll let you know as soon as you're approved — usually within a day or two.
+    </div>
+    <button class="btn btn-ghost" id="waitingSignOutBtn" style="margin-top:22px;">Sign out</button>
+  </div>
+
+  <div class="pf-label" style="margin:22px 2px 10px;">While you wait, come say hello</div>
+  <div class="info-card">
+    <div class="info-num" style="font-size:14px;">&#127942;</div>
+    <div>
+      <div class="info-card-title">Trivia Night</div>
+      <div class="info-card-text">Wednesdays &middot; Felons Brewing Co.</div>
+    </div>
+  </div>
+  <div class="info-card">
+    <div class="info-num" style="font-size:14px;">&#127939;</div>
+    <div>
+      <div class="info-card-title">Parkrun</div>
+      <div class="info-card-text">Saturdays, 6:40am &middot; Southbank parkrun</div>
+    </div>
+  </div>
+  <div class="info-cta-sub">Come along and meet the community — it also counts toward your in-person verification.</div>
+</div>
+
 <script>
 // ============================================================
 // CONFIG — paste your Supabase project details here
@@ -391,7 +427,7 @@ document.getElementById('authBtn').onclick = async () => {
       await sb.from('profiles').update({
         age: age ? parseInt(age) : null,
         gender, suburb, profession, interests,
-        email_verified: false, id_verified: false, meetup_verified: false
+        email_verified: false, id_verified: false, meetup_verified: false, approved: false
       }).eq('id', data.user.id);
       await onLoggedIn();
     }
@@ -579,11 +615,22 @@ async function onLoggedIn(){
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   currentProfile = profile;
   document.getElementById('authScreen').style.display = 'none';
+
+  if(!profile.approved && !profile.is_admin){
+    document.getElementById('waitingScreen').classList.add('active');
+    return;
+  }
+
   document.getElementById('app').classList.add('active');
   if(currentProfile && currentProfile.is_admin) document.getElementById('adminTab').style.display = 'block';
   loadToday();
   loadChats();
 }
+
+document.getElementById('waitingSignOutBtn').onclick = async () => {
+  await sb.auth.signOut();
+  location.reload();
+};
 
 // ---------- RESET COUNTDOWN (5:00am Brisbane time, same instant for every user) ----------
 // Brisbane (Australia/Brisbane, Queensland) does not observe daylight saving, so it's a
@@ -869,22 +916,54 @@ async function loadAdmin(){
     return;
   }
 
+  const approvedUsers = users.filter(u => u.approved);
+  const pendingUsers = users.filter(u => !u.approved && !u.is_admin);
+  const maleApproved = approvedUsers.filter(u => u.gender && u.gender.toLowerCase() === 'male').length;
+  const femaleApproved = approvedUsers.filter(u => u.gender && u.gender.toLowerCase() === 'female').length;
+  const balancePct = (maleApproved + femaleApproved) > 0 ? Math.round(maleApproved / (maleApproved + femaleApproved) * 100) : null;
+
+  const pendingHtml = pendingUsers.length ? pendingUsers.map(p => `
+      <div class="info-card" style="align-items:center; background:var(--rose-soft);">
+        <div class="avatar" style="width:44px;height:44px;font-size:15px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
+        <div style="flex:1;">
+          <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
+          <div class="person-sub">${[p.gender, p.profession, p.suburb].filter(Boolean).join(' · ') || 'No bio yet'}</div>
+          <div class="verify-badges">${verificationBadges(p)}</div>
+        </div>
+        <div class="swap-let-go" onclick="setApproval('${p.id}', true)">Approve</div>
+      </div>`).join('')
+    : `<div class="info-cta-sub" style="margin:10px 0 4px;">No one waiting on verification right now.</div>`;
+
   panel.innerHTML = `
     <div class="pf-label" style="margin:8px 0 12px;">${users.length} total users</div>
-    <button class="btn" style="margin-bottom:16px;" onclick="simulateNextDay()">&#9200; Simulate Next Day (everyone)</button>
+
+    <div class="info-card" style="margin-bottom:16px;">
+      <div style="flex:1;">
+        <div class="info-card-title">Approved gender balance</div>
+        <div class="info-card-text">${maleApproved} male &middot; ${femaleApproved} female${balancePct !== null ? ` (${balancePct}% male)` : ' — no approved users yet'}</div>
+      </div>
+    </div>
+
+    <div class="pf-label" style="margin-top:0;">Pending Verification (${pendingUsers.length})</div>
+    ${pendingHtml}
+
+    <button class="btn" style="margin-bottom:16px; margin-top:10px;" onclick="simulateNextDay()">&#9200; Simulate Next Day (everyone)</button>
     <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="generateAllMatches()">&#127919; Generate Today's Matches for Everyone</button>
     <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="resetMyData()">&#128465; Reset My Matches &amp; Chats</button>
     <button class="btn btn-ghost" style="margin-bottom:16px; color:var(--rose);" onclick="resetAllData()">&#9888; Reset EVERYONE's Matches &amp; Chats</button>
     <div class="err" id="simulateErr" style="display:none;"></div>
+
+    <div class="pf-label" style="margin-top:6px;">All Users</div>
     ${users.map(p => `
       <div class="info-card" style="align-items:center;">
         <div class="avatar" style="width:44px;height:44px;font-size:15px; ${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
         <div style="flex:1;">
-          <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.is_admin ? '<span class="v-badge on">Admin</span>' : ''} ${p.is_test_account ? '<span class="v-badge on">&#9989; Test</span>' : ''}</div>
+          <div class="person-name">${p.name}${p.age ? ', ' + p.age : ''} ${p.is_admin ? '<span class="v-badge on">Admin</span>' : ''} ${p.is_test_account ? '<span class="v-badge on">&#9989; Test</span>' : ''} ${p.is_admin ? '' : (p.approved ? '<span class="v-badge on">Approved</span>' : '<span class="v-badge">Pending</span>')}</div>
           <div class="person-sub">${[p.gender, p.profession, p.suburb].filter(Boolean).join(' · ') || 'No bio yet'}</div>
           <div class="verify-badges">${verificationBadges(p)}</div>
         </div>
         ${p.is_test_account && p.test_login_email ? `<div class="swap-let-go" onclick="loginAsTestUser('${p.test_login_email}', '${p.name}')">Log in as</div>` : ''}
+        ${!p.is_admin ? `<div class="photo-upload-label" style="color:var(--ink-soft); margin-left:8px;" onclick="setApproval('${p.id}', ${p.approved ? 'false' : 'true'})">${p.approved ? 'Un-approve' : 'Approve'}</div>` : ''}
       </div>`).join('')}
     <div class="info-cta-sub" style="margin-top:10px;">Emails aren't shown here — view those in Supabase's Authentication tab. Toggle verification tiers in Table Editor > profiles.</div>
 
@@ -944,6 +1023,12 @@ function renderMatchHistory(){
         </div>
       </div>
     </div>`).join('');
+}
+
+async function setApproval(userId, approved){
+  const { error } = await sb.from('profiles').update({ approved }).eq('id', userId);
+  if(error){ alert(error.message); return; }
+  loadAdmin();
 }
 
 async function loginAsTestUser(email, name){
