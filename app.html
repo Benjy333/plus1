@@ -229,7 +229,8 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
         <label>Your name</label>
         <input type="text" id="nameInput" placeholder="Jordan">
         <label>Age</label>
-        <input type="number" id="ageInput" placeholder="29" min="18" max="99">
+        <input type="number" id="ageInput" placeholder="29" min="25" max="35">
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">Must be between 25 and 35. Age and gender can't be changed after sign-up.</div>
         <label>Gender</label>
         <select id="genderInput" style="width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:14px; font-family:'Manrope',sans-serif; outline:none; background:#fff;">
           <option value="">Select...</option>
@@ -365,6 +366,13 @@ document.getElementById('authBtn').onclick = async () => {
   }
 
   if(mode === 'signup'){
+    const ageNum = parseInt(age);
+    if(isNaN(ageNum) || ageNum < 25 || ageNum > 35){
+      errBox.textContent = 'Age must be between 25 and 35.';
+      errBox.style.display = 'block';
+      return;
+    }
+
     const { data, error } = await sb.auth.signUp({
       email, password, options: { data: { name } }
     });
@@ -944,17 +952,19 @@ async function renderProfileTab(){
 function showEditProfile(){
   const p = currentProfile;
   const form = document.getElementById('editProfileForm');
+  const lockedGenderLabel = p.gender ? (p.gender.toLowerCase()==='male' ? 'Male' : p.gender.toLowerCase()==='female' ? 'Female' : p.gender) : '—';
   form.innerHTML = `
     <div style="margin-top:12px;">
       <label>Name</label>
       <input type="text" id="editName" value="${p.name || ''}">
       <label>Age</label>
-      <input type="number" id="editAge" value="${p.age || ''}" min="18" max="99">
+      <div class="pf-text" style="padding:12px 14px; background:var(--paper); border:1.5px solid var(--border); border-radius:12px;">
+        ${p.age || '—'} <span style="color:var(--ink-soft); font-weight:600; font-size:11px;">&#128274; Can't be changed</span>
+      </div>
       <label>Gender</label>
-      <select id="editGender" style="width:100%; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-size:14px; font-family:'Manrope',sans-serif; outline:none; background:#fff;">
-        <option value="male" ${p.gender && p.gender.toLowerCase()==='male' ? 'selected' : ''}>Male</option>
-        <option value="female" ${p.gender && p.gender.toLowerCase()==='female' ? 'selected' : ''}>Female</option>
-      </select>
+      <div class="pf-text" style="padding:12px 14px; background:var(--paper); border:1.5px solid var(--border); border-radius:12px;">
+        ${lockedGenderLabel} <span style="color:var(--ink-soft); font-weight:600; font-size:11px;">&#128274; Can't be changed</span>
+      </div>
       <label>Brisbane suburb</label>
       <input type="text" id="editSuburb" value="${p.suburb || ''}">
       <label>Profession</label>
@@ -980,21 +990,20 @@ async function saveEditProfile(){
   errBox.style.display = 'none';
 
   const name = document.getElementById('editName').value.trim();
-  const age = document.getElementById('editAge').value.trim();
-  const gender = document.getElementById('editGender').value;
   const suburb = document.getElementById('editSuburb').value.trim();
   const profession = document.getElementById('editProfession').value.trim();
   const interests = document.getElementById('editInterests').value.trim();
   const bio = document.getElementById('editBio').value.trim();
 
-  if(!name || !age || !suburb){
-    errBox.textContent = 'Name, age, and suburb are required.';
+  if(!name || !suburb){
+    errBox.textContent = 'Name and suburb are required.';
     errBox.style.display = 'block';
     return;
   }
 
+  // age and gender are intentionally excluded — locked after sign-up
   const { error } = await sb.from('profiles').update({
-    name, age: parseInt(age), gender, suburb, profession, interests, bio
+    name, suburb, profession, interests, bio
   }).eq('id', currentUser.id);
 
   if(error){
