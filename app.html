@@ -368,7 +368,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-02';
+const BUILD_VERSION = 'build 2026-08-14-03';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -607,13 +607,22 @@ async function updatePassword(){
   setTimeout(() => { location.href = window.location.href.split('#')[0].split('?')[0]; }, 1200);
 }
 
+// Single source of truth for which top-level screen is showing. Every switch
+// between auth / waiting / app goes through here, and it always sets the state
+// of all three explicitly in one synchronous block — so it's structurally
+// impossible for two screens to end up visible at once, regardless of what
+// order events happen to fire in.
+function showScreen(screen){
+  document.getElementById('authScreen').style.display = screen === 'auth' ? 'block' : 'none';
+  document.getElementById('waitingScreen').classList.toggle('active', screen === 'waiting');
+  document.getElementById('app').classList.toggle('active', screen === 'app');
+}
+
 // listen for the recovery session created when the user clicks the emailed reset link
 sb.auth.onAuthStateChange((event) => {
   if(event === 'PASSWORD_RECOVERY'){
     isPasswordRecovery = true;
-    document.getElementById('app').classList.remove('active');
-    document.getElementById('waitingScreen').classList.remove('active');
-    document.getElementById('authScreen').style.display = 'block';
+    showScreen('auth');
     showResetPasswordForm();
   }
 });
@@ -629,17 +638,14 @@ async function onLoggedIn(){
   currentUser = user;
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   currentProfile = profile;
-  document.getElementById('authScreen').style.display = 'none';
 
   if(REQUIRE_APPROVAL && !profile.approved && !profile.is_admin){
-    document.getElementById('app').classList.remove('active');
-    document.getElementById('waitingScreen').classList.add('active');
+    showScreen('waiting');
     renderEventsCalendar();
     return;
   }
 
-  document.getElementById('waitingScreen').classList.remove('active');
-  document.getElementById('app').classList.add('active');
+  showScreen('app');
   if(currentProfile && currentProfile.is_admin) document.getElementById('adminTab').style.display = 'block';
   loadToday();
   loadChats();
