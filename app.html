@@ -601,6 +601,7 @@ sb.auth.onAuthStateChange((event) => {
   if(event === 'PASSWORD_RECOVERY'){
     isPasswordRecovery = true;
     document.getElementById('app').classList.remove('active');
+    document.getElementById('waitingScreen').classList.remove('active');
     document.getElementById('authScreen').style.display = 'block';
     showResetPasswordForm();
   }
@@ -614,11 +615,13 @@ async function onLoggedIn(){
   document.getElementById('authScreen').style.display = 'none';
 
   if(!profile.approved && !profile.is_admin){
+    document.getElementById('app').classList.remove('active');
     document.getElementById('waitingScreen').classList.add('active');
     renderEventsCalendar();
     return;
   }
 
+  document.getElementById('waitingScreen').classList.remove('active');
   document.getElementById('app').classList.add('active');
   if(currentProfile && currentProfile.is_admin) document.getElementById('adminTab').style.display = 'block';
   loadToday();
