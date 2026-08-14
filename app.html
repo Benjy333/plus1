@@ -63,6 +63,12 @@ input:focus{ border-color:var(--rose); }
 .app{ display:none; width:100%; max-width:420px; height:88vh; background:var(--white); border-radius:28px; box-shadow:var(--shadow); overflow:hidden; display:none; flex-direction:column; }
 .waiting-screen{ display:none; }
 .waiting-screen.active{ display:block; }
+/* The mobile media query below sets display:flex on every .wrap element (for
+   layout reasons), which has equal CSS specificity to the rules above and comes
+   later in source order — so on phones it was overriding these and forcing the
+   waiting screen visible even without the .active class. This rule guarantees
+   it stays hidden whenever inactive, regardless of viewport width or source order. */
+#waitingScreen:not(.active){ display:none !important; }
 .cal-card{ background:var(--white); border-radius:20px; box-shadow:0 10px 30px rgba(31,32,36,0.07); padding:16px; margin-bottom:6px; }
 .cal-header{ text-align:center; font-weight:800; font-size:14px; margin-bottom:12px; }
 .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:34px; gap:4px; }
@@ -368,7 +374,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-04';
+const BUILD_VERSION = 'build 2026-08-14-05';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -631,7 +637,7 @@ sb.auth.onAuthStateChange((event) => {
 // admins) see the waiting screen instead of the app; approved users and admins
 // always go straight to the app. Set to false to bypass the gate entirely if
 // ever needed for troubleshooting.
-const REQUIRE_APPROVAL = false;
+const REQUIRE_APPROVAL = true;
 
 async function onLoggedIn(){
   const { data: { user } } = await sb.auth.getUser();
@@ -1656,3 +1662,4 @@ applySkin(localStorage.getItem('plus1_skin') || 'plus1');
 </script>
 </body>
 </html>
+  
