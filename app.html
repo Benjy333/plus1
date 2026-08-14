@@ -578,6 +578,9 @@ async function loadToday(){
               <div class="today-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
             </div>
           </div>
+          <div style="padding:12px 16px 0; text-align:center;">
+            <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="openProfile('${otherId}')">View full profile</div>
+          </div>
           <div style="padding:16px; text-align:center;">
             <div class="info-cta-sub" style="margin-bottom:10px;">You let this one go.</div>
             <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="decideMatch('${match.id}', 'yes')">Change my mind — Keep instead</div>
@@ -610,6 +613,9 @@ async function loadToday(){
             <div class="today-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
           </div>
         </div>
+        <div style="padding:12px 16px 0; text-align:center;">
+          <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="openProfile('${otherId}')">View full profile</div>
+        </div>
         <div style="padding:16px; text-align:center;">
           <div class="v-badge on" style="font-size:12px; padding:6px 12px;">You voted Yes</div>
           <div class="info-cta-sub" style="margin-top:8px; margin-bottom:12px;">Waiting for ${p.name} to confirm before it's a match.</div>
@@ -630,6 +636,9 @@ async function loadToday(){
           <div class="today-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
           <div class="today-sub">${[p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
         </div>
+      </div>
+      <div style="padding:12px 16px 0; text-align:center;">
+        <div class="photo-upload-label" style="color:var(--ink-soft);" onclick="openProfile('${otherId}')">View full profile</div>
       </div>
       <div class="today-actions">
         <button class="btn btn-ghost" onclick="decideMatch('${match.id}', 'no')">Let Go</button>
