@@ -374,7 +374,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-05';
+const BUILD_VERSION = 'build 2026-08-14-07';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -652,7 +652,13 @@ async function onLoggedIn(){
   }
 
   showScreen('app');
-  if(currentProfile && currentProfile.is_admin) document.getElementById('adminTab').style.display = 'block';
+  if(currentProfile && currentProfile.is_admin){
+    document.getElementById('adminTab').style.display = 'block';
+    // Piggybacks on the admin's own login instead of needing a cron job — every
+    // time an admin opens the app, generate matches for anyone who doesn't
+    // already have one today, so the admin panel fills in without extra clicks.
+    sb.rpc('admin_generate_all_matches_for_today').catch(() => {});
+  }
   loadToday();
   loadChats();
 }
@@ -1431,10 +1437,22 @@ async function addReferral(){
     return;
   }
 
-  // fire off the invite email — don't block the UI if this fails
+  // fire off the invite email — the referral itself is already saved either way,
+  // so we don't block the UI on this, but we do show a soft warning if it fails
+  // instead of silently swallowing it (which made this impossible to debug before).
   sb.functions.invoke('send-referral-email', {
     body: { referredEmail: email, referrerName: currentProfile.name }
-  }).catch(() => {});
+  }).then(({ error: fnError }) => {
+    if(fnError){
+      errBox.style.color = 'var(--rose)';
+      errBox.textContent = 'Saved, but the invite email failed to send: ' + fnError.message;
+      errBox.style.display = 'block';
+    }
+  }).catch((err) => {
+    errBox.style.color = 'var(--rose)';
+    errBox.textContent = 'Saved, but the invite email failed to send: ' + (err.message || 'unknown error');
+    errBox.style.display = 'block';
+  });
   input.value = '';
   loadReferrals();
 }
@@ -1662,4 +1680,3 @@ applySkin(localStorage.getItem('plus1_skin') || 'plus1');
 </script>
 </body>
 </html>
-  
