@@ -368,7 +368,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-03';
+const BUILD_VERSION = 'build 2026-08-14-04';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -631,7 +631,7 @@ sb.auth.onAuthStateChange((event) => {
 // admins) see the waiting screen instead of the app; approved users and admins
 // always go straight to the app. Set to false to bypass the gate entirely if
 // ever needed for troubleshooting.
-const REQUIRE_APPROVAL = true;
+const REQUIRE_APPROVAL = false;
 
 async function onLoggedIn(){
   const { data: { user } } = await sb.auth.getUser();
