@@ -63,6 +63,16 @@ input:focus{ border-color:var(--rose); }
 .app{ display:none; width:100%; max-width:420px; height:88vh; background:var(--white); border-radius:28px; box-shadow:var(--shadow); overflow:hidden; display:none; flex-direction:column; }
 .waiting-screen{ display:none; }
 .waiting-screen.active{ display:block; }
+.cal-card{ background:var(--white); border-radius:20px; box-shadow:0 10px 30px rgba(31,32,36,0.07); padding:16px; margin-bottom:6px; }
+.cal-header{ text-align:center; font-weight:800; font-size:14px; margin-bottom:12px; }
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.cal-dow{ text-align:center; font-size:10px; font-weight:700; color:var(--ink-soft); padding-bottom:4px; }
+.cal-day{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:8px; font-size:11px; font-weight:600; color:var(--ink); gap:2px; }
+.cal-day.empty{ visibility:hidden; }
+.cal-day .dot{ width:5px; height:5px; border-radius:50%; }
+.cal-legend{ display:flex; flex-direction:column; gap:7px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+.cal-legend-item{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-soft); font-weight:500; }
+.cal-legend-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .app.active{ display:flex; }
 .topbar{ padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 .topbar .wordmark{ margin:0; font-size:18px; text-align:left; }
@@ -337,20 +347,7 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
   </div>
 
   <div class="pf-label" style="margin:22px 2px 10px;">While you wait, come say hello</div>
-  <div class="info-card">
-    <div class="info-num" style="font-size:14px;">&#127942;</div>
-    <div>
-      <div class="info-card-title">Trivia Night</div>
-      <div class="info-card-text">Wednesdays &middot; Felons Brewing Co.</div>
-    </div>
-  </div>
-  <div class="info-card">
-    <div class="info-num" style="font-size:14px;">&#127939;</div>
-    <div>
-      <div class="info-card-title">Parkrun</div>
-      <div class="info-card-text">Saturdays, 6:40am &middot; Southbank parkrun</div>
-    </div>
-  </div>
+  <div id="eventsCalendar"></div>
   <div class="info-cta-sub">Come along and meet the community — it also counts toward your in-person verification.</div>
 </div>
 
@@ -618,6 +615,7 @@ async function onLoggedIn(){
 
   if(!profile.approved && !profile.is_admin){
     document.getElementById('waitingScreen').classList.add('active');
+    renderEventsCalendar();
     return;
   }
 
@@ -631,6 +629,56 @@ document.getElementById('waitingSignOutBtn').onclick = async () => {
   await sb.auth.signOut();
   location.reload();
 };
+
+// ---------- EVENTS CALENDAR (shown on the waiting screen) ----------
+// Recurring in-person events: Trivia every Wednesday, Parkrun every Saturday,
+// and Drag Bingo specifically on the LAST Thursday of the month (not every Thursday).
+function renderEventsCalendar(){
+  const container = document.getElementById('eventsCalendar');
+  if(!container) return;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthName = now.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startWeekday = new Date(year, month, 1).getDay(); // 0 = Sunday
+
+  // find the last Thursday of the month
+  let lastThursday = null;
+  for(let d = daysInMonth; d >= 1; d--){
+    if(new Date(year, month, d).getDay() === 4){ lastThursday = d; break; }
+  }
+
+  const dowLabels = ['S','M','T','W','T','F','S'];
+  let cellsHtml = '';
+  for(let i = 0; i < startWeekday; i++){
+    cellsHtml += `<div class="cal-day empty"></div>`;
+  }
+  for(let d = 1; d <= daysInMonth; d++){
+    const dow = new Date(year, month, d).getDay();
+    let dot = '';
+    if(dow === 3) dot = `<span class="dot" style="background:var(--rose);"></span>`; // Wednesday — Trivia
+    else if(dow === 6) dot = `<span class="dot" style="background:#2D9CDB;"></span>`; // Saturday — Parkrun
+    else if(d === lastThursday) dot = `<span class="dot" style="background:#9B59B6;"></span>`; // last Thursday — Drag Bingo
+    cellsHtml += `<div class="cal-day">${d}${dot}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="cal-card">
+      <div class="cal-header">${monthName}</div>
+      <div class="cal-grid">
+        ${dowLabels.map(l => `<div class="cal-dow">${l}</div>`).join('')}
+        ${cellsHtml}
+      </div>
+      <div class="cal-legend">
+        <div class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--rose);"></span>Trivia Night &middot; Wednesdays &middot; Felons Brewing Co.</div>
+        <div class="cal-legend-item"><span class="cal-legend-dot" style="background:#2D9CDB;"></span>Parkrun &middot; Saturdays, 6:40am &middot; Southbank parkrun</div>
+        <div class="cal-legend-item"><span class="cal-legend-dot" style="background:#9B59B6;"></span>Drag Bingo &middot; Last Thursday of the month</div>
+      </div>
+    </div>`;
+}
 
 // ---------- RESET COUNTDOWN (5:00am Brisbane time, same instant for every user) ----------
 // Brisbane (Australia/Brisbane, Queensland) does not observe daylight saving, so it's a
