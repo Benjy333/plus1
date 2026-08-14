@@ -607,6 +607,12 @@ sb.auth.onAuthStateChange((event) => {
   }
 });
 
+// Gates access behind admin approval. Users with approved=false (and who aren't
+// admins) see the waiting screen instead of the app; approved users and admins
+// always go straight to the app. Set to false to bypass the gate entirely if
+// ever needed for troubleshooting.
+const REQUIRE_APPROVAL = true;
+
 async function onLoggedIn(){
   const { data: { user } } = await sb.auth.getUser();
   currentUser = user;
@@ -614,7 +620,7 @@ async function onLoggedIn(){
   currentProfile = profile;
   document.getElementById('authScreen').style.display = 'none';
 
-  if(!profile.approved && !profile.is_admin){
+  if(REQUIRE_APPROVAL && !profile.approved && !profile.is_admin){
     document.getElementById('app').classList.remove('active');
     document.getElementById('waitingScreen').classList.add('active');
     renderEventsCalendar();
@@ -1633,3 +1639,4 @@ applySkin(localStorage.getItem('plus1_skin') || 'plus1');
 </script>
 </body>
 </html>
+  
