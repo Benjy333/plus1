@@ -633,8 +633,8 @@ document.getElementById('waitingSignOutBtn').onclick = async () => {
 // ---------- EVENTS CALENDAR (shown on the waiting screen) ----------
 // Recurring in-person events: Trivia every Wednesday, Parkrun every Saturday,
 // and Drag Bingo specifically on the LAST Thursday of the month (not every Thursday).
-function renderEventsCalendar(){
-  const container = document.getElementById('eventsCalendar');
+function renderEventsCalendar(containerId){
+  const container = document.getElementById(containerId || 'eventsCalendar');
   if(!container) return;
 
   const now = new Date();
@@ -1344,6 +1344,10 @@ function renderInfoTab(){
     <a class="info-cta" href="plus1-pitch.pdf" target="_blank" rel="noopener">Read the full pitch deck</a>
     <div class="info-cta-sub">Problem, market, business model, and go-to-market plan</div>
 
+    <div class="pf-label" style="margin-top:24px;">This month's meetups</div>
+    <div class="info-card-text" style="margin-bottom:10px;">Attending counts toward your in-person verification.</div>
+    <div id="infoEventsCalendar"></div>
+
     <div class="pf-label" style="margin-top:24px;">Refer friends</div>
     <div class="info-card-text" style="margin-bottom:10px;">You can refer up to 3 people. Once they sign up with the email you add, they'll show as "Referred" verified.</div>
     <div id="referralList"></div>
@@ -1357,6 +1361,7 @@ function renderInfoTab(){
     <div class="info-card-text" style="margin-bottom:10px;">Something not working, or a safety concern that isn't about a specific person? Let us know.</div>
     <div class="report-link" onclick="openReportModal(null, null)">&#9873; Report a problem</div>`;
   loadReferrals();
+  renderEventsCalendar('infoEventsCalendar');
 }
 
 async function loadReferrals(){
