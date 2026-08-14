@@ -945,8 +945,38 @@ async function renderProfileTab(){
     ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
     ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
     <div class="photo-upload-label" style="margin-top:14px;" onclick="showEditProfile()">Edit profile</div>
+    <div class="photo-upload-label" style="margin-top:6px;" onclick="previewMyProfile()">&#128065; Preview as others see you</div>
     <div id="editProfileForm"></div>
     <div class="info-cta-sub" style="margin-top:16px;">This is what other people see about you.</div>`;
+}
+
+// ---------- PREVIEW MY PROFILE (see yourself as others see you) ----------
+function previewMyProfile(){
+  const p = currentProfile;
+  const genderLabel = p.gender ? (p.gender.toLowerCase()==='male'?'Male':p.gender.toLowerCase()==='female'?'Female':p.gender) : null;
+  const drawer = document.getElementById('profileDrawer');
+  const hasContent = p.bio || p.interests || p.tagline;
+  drawer.innerHTML = `
+    <div class="pf-hero" style="${avatarBg(p)}">
+      <div class="pf-hero-back" onclick="closeProfile()">&#8592;</div>
+      ${p.avatar_url ? '' : `<div class="pf-hero-initial">${initials(p.name)}</div>`}
+      <div class="pf-hero-overlay">
+        <div class="pf-hero-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
+        <div class="pf-hero-sub">${[genderLabel, p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
+      </div>
+    </div>
+    <div class="pf-full-body">
+      <div style="background:var(--rose-soft); color:var(--rose); font-size:12px; font-weight:700; text-align:center; padding:10px 14px; border-radius:12px; margin-bottom:14px;">
+        &#128065; This is what other members see on your profile
+      </div>
+      <div class="verify-badges" style="margin-bottom:14px;">${verificationBadges(p)}</div>
+      ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
+      ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
+      ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
+      ${hasContent ? '' : `<div class="empty" style="margin-top:20px;">You haven't added an About, Interests, or Tagline yet — add some from Edit profile to help your matches get to know you.</div>`}
+    </div>
+  `;
+  drawer.classList.add('active');
 }
 
 function showEditProfile(){
@@ -1199,11 +1229,12 @@ async function submitReport(reportedUserId){
 }
 
 // ---------- VIEW PROFILE ----------
-async function openProfile(userId){
+async function openProfile(userId, conversationId){
   const { data: p } = await sb.from('profiles').select('*').eq('id', userId).single();
   if(!p) return;
   const genderLabel = p.gender ? (p.gender.toLowerCase()==='male'?'Male':p.gender.toLowerCase()==='female'?'Female':p.gender) : null;
   const drawer = document.getElementById('profileDrawer');
+  const safeName = (p.name||'').replace(/'/g,"\\'");
   drawer.innerHTML = `
     <div class="pf-hero" style="${avatarBg(p)}">
       <div class="pf-hero-back" onclick="closeProfile()">&#8592;</div>
@@ -1218,10 +1249,45 @@ async function openProfile(userId){
       ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
       ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
       ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
-      <div class="report-link" onclick="openReportModal('${p.id}', '${(p.name||'').replace(/'/g,"\\'")}')">&#9873; Report ${p.name}</div>
+      <div class="report-link" onclick="openReportModal('${p.id}', '${safeName}')">&#9873; Report ${p.name}</div>
+      ${conversationId ? `<div class="report-link" style="color:var(--rose);" onclick="unmatchConversation('${conversationId}')">&#128683; Unmatch</div>` : ''}
+      <div class="report-link" style="color:var(--rose);" onclick="blockUser('${p.id}', '${safeName}', ${conversationId ? `'${conversationId}'` : 'null'})">&#128683; Block ${p.name}</div>
     </div>
   `;
   drawer.classList.add('active');
+}
+
+// ---------- UNMATCH / BLOCK ----------
+async function unmatchConversation(conversationId){
+  if(!confirm("Unmatch this person? This ends the conversation and removes it from your chats. They won't be notified.")) return;
+  const { error } = await sb.from('conversations').update({ status: 'dropped' }).eq('id', conversationId);
+  if(error){ alert(error.message); return; }
+  closeProfile();
+  switchTab('chats');
+}
+
+async function blockUser(userId, name, conversationId){
+  if(!confirm(`Block ${name}? You'll never be matched with them again, and any current conversation with them will end immediately. This can't be undone from within the app.`)) return;
+
+  // end this conversation if we know it, otherwise end any active conversation with them
+  if(conversationId){
+    await sb.from('conversations').update({ status: 'dropped' }).eq('id', conversationId);
+  } else {
+    await sb.from('conversations').update({ status: 'dropped' })
+      .eq('status', 'active')
+      .or(`and(user_a.eq.${currentUser.id},user_b.eq.${userId}),and(user_a.eq.${userId},user_b.eq.${currentUser.id})`);
+  }
+
+  const { error } = await sb.from('blocked_users').insert({ blocker_id: currentUser.id, blocked_id: userId });
+  if(error){
+    alert(error.message.includes('does not exist')
+      ? "Blocking isn't set up on the database yet — the blocked_users table is missing."
+      : error.message);
+    return;
+  }
+
+  closeProfile();
+  switchTab('chats');
 }
 
 function closeProfile(){
@@ -1243,7 +1309,7 @@ async function openChat(conversationId, otherId){
       <div class="back" onclick="switchTab('chats')">&#8592;</div>
       <div class="avatar" style="width:36px;height:36px;font-size:13px; ${avatarBg(other)}">${other.avatar_url ? '' : initials(other.name)}</div>
       <div class="person-name">${other.name}</div>
-      <div class="view-profile-link" onclick="openProfile('${other.id}')">View Profile</div>
+      <div class="view-profile-link" onclick="openProfile('${other.id}', '${conversationId}')">View Profile</div>
     </div>
     <div class="messages" id="msgList"></div>
     <div class="input-row">
