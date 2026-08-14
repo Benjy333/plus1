@@ -271,6 +271,15 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
       <button class="btn" id="resetBtn" onclick="updatePassword()">Set new password</button>
       <div class="err" id="resetErr"></div>
     </div>
+
+    <div id="recoveryConfirmFields" style="display:none;">
+      <div style="font-size:13px; color:var(--ink-soft); line-height:1.5; margin:6px 0 4px;">
+        Tap below to continue resetting your password. This extra step keeps your link from being used up automatically by email security scanners before you get to click it.
+      </div>
+      <button class="btn" id="recoveryConfirmBtn" onclick="confirmRecoveryLink()">Continue — reset my password</button>
+      <div class="err" id="recoveryConfirmErr"></div>
+      <div class="switch" onclick="showLoginSignup()">Back to log in</div>
+    </div>
   </div>
 </div>
 
@@ -404,6 +413,7 @@ function showForgotPassword(){
   document.getElementById('loginSignupFields').style.display = 'none';
   document.getElementById('forgotFields').style.display = 'block';
   document.getElementById('resetFields').style.display = 'none';
+  document.getElementById('recoveryConfirmFields').style.display = 'none';
   document.getElementById('authTitle').textContent = 'Reset your password';
   const errBox = document.getElementById('forgotErr');
   errBox.style.display = 'none';
@@ -414,14 +424,84 @@ function showLoginSignup(){
   document.getElementById('loginSignupFields').style.display = 'block';
   document.getElementById('forgotFields').style.display = 'none';
   document.getElementById('resetFields').style.display = 'none';
+  document.getElementById('recoveryConfirmFields').style.display = 'none';
   document.getElementById('authTitle').textContent = mode === 'login' ? 'Log in' : 'Create your account';
 }
 
 function showResetPasswordForm(){
   document.getElementById('loginSignupFields').style.display = 'none';
   document.getElementById('forgotFields').style.display = 'none';
+  document.getElementById('recoveryConfirmFields').style.display = 'none';
   document.getElementById('resetFields').style.display = 'block';
   document.getElementById('authTitle').textContent = 'Set a new password';
+}
+
+// The reset email link lands here with ?type=recovery&token_hash=... in the URL.
+// We deliberately do NOT verify the token just because the page loaded — email
+// security scanners (Outlook Safe Links, Gmail, corporate scanners) often open
+// links automatically to check them, which would burn a one-time token before
+// the person ever sees the email. Instead we show a plain landing screen and
+// only call verifyOtp() once they explicitly tap "Continue".
+function getQueryParam(name){
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+function handleRecoveryLinkIfPresent(){
+  const type = getQueryParam('type');
+  const tokenHash = getQueryParam('token_hash');
+  if(type === 'recovery' && tokenHash){
+    document.getElementById('loginSignupFields').style.display = 'none';
+    document.getElementById('forgotFields').style.display = 'none';
+    document.getElementById('resetFields').style.display = 'none';
+    document.getElementById('recoveryConfirmFields').style.display = 'block';
+    document.getElementById('recoveryConfirmFields').dataset.tokenHash = tokenHash;
+    document.getElementById('authTitle').textContent = 'Reset your password';
+    return true;
+  }
+  return false;
+}
+
+async function confirmRecoveryLink(){
+  const errBox = document.getElementById('recoveryConfirmErr');
+  errBox.style.display = 'none';
+  errBox.style.color = 'var(--rose)';
+
+  const tokenHash = document.getElementById('recoveryConfirmFields').dataset.tokenHash;
+  const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+
+  if(error){
+    errBox.textContent = (error.message || '').toLowerCase().includes('expired') || (error.message || '').toLowerCase().includes('invalid')
+      ? "This link has expired or was already used — often because an email security scanner opened it automatically before you clicked it. Go back and request a new one."
+      : error.message;
+    errBox.style.display = 'block';
+    return;
+  }
+
+  isPasswordRecovery = true;
+  // remove the token from the address bar now that it's been used
+  history.replaceState(null, '', window.location.pathname);
+  showResetPasswordForm();
+}
+
+// Supabase appends #error=...&error_code=...&error_description=... to the redirect
+// URL when a link fails (e.g. expired/invalid). Surface that instead of silently
+// landing back on a blank login screen.
+function checkAuthErrorInUrl(){
+  const hash = window.location.hash;
+  if(hash && hash.includes('error=')){
+    const params = new URLSearchParams(hash.substring(1));
+    const description = params.get('error_description');
+    const code = params.get('error_code');
+    if(description){
+      const errBox = document.getElementById('authErr');
+      let text = decodeURIComponent(description.replace(/\+/g, ' '));
+      if(code === 'otp_expired') text += ' Please request a new reset link.';
+      errBox.style.color = 'var(--rose)';
+      errBox.textContent = text;
+      errBox.style.display = 'block';
+    }
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
 }
 
 async function sendPasswordReset(){
@@ -1398,6 +1478,10 @@ applySkin(localStorage.getItem('plus1_skin') || 'plus1');
 
 // ---------- ON LOAD: resume session if already logged in ----------
 (async () => {
+  checkAuthErrorInUrl();
+  const cameFromRecoveryLink = handleRecoveryLinkIfPresent();
+  if(cameFromRecoveryLink) return; // wait for the person to tap "Continue" before doing anything else
+
   const { data: { session } } = await sb.auth.getSession();
   if(session && !isPasswordRecovery){ await onLoggedIn(); }
 })();
