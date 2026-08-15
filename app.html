@@ -188,7 +188,7 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
 .input-row{ display:flex; gap:8px; padding:14px 16px; border-top:1px solid var(--border); align-items:flex-end; }
 .input-row input{ flex:1; border-radius:999px; }
 .input-row textarea{
-  flex:1; resize:none; overflow-y:auto; max-height:120px; min-height:44px;
+  flex:1; min-width:0; resize:none; overflow-y:auto; max-height:120px; min-height:44px;
   border:1.5px solid var(--border); border-radius:20px; padding:12px 16px;
   font-size:14px; font-family:'Manrope',sans-serif; outline:none; line-height:1.4;
 }
@@ -385,7 +385,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-12';
+const BUILD_VERSION = 'build 2026-08-14-13';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
