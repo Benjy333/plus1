@@ -386,7 +386,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-15';
+const BUILD_VERSION = 'build 2026-08-14-16';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -1237,6 +1237,19 @@ function previewMyProfile(){
   const genderLabel = p.gender ? (p.gender.toLowerCase()==='male'?'Male':p.gender.toLowerCase()==='female'?'Female':p.gender) : null;
   const drawer = document.getElementById('profileDrawer');
   const hasContent = p.bio || p.school || p.interests || p.dislikes || p.tagline;
+
+  // There's no real conversation to check message_count against here (you're
+  // previewing yourself, not a specific match), so instead of pretending
+  // everything's unlocked, show each gated field alongside exactly when it
+  // unlocks — this is the actual reveal schedule every match will experience.
+  function scheduleSection(label, value, unlockAt){
+    if(!value) return '';
+    return `<div class="pf-section">
+      <div class="pf-label">${label} <span style="text-transform:none; font-weight:600; color:var(--ink-soft);">— unlocks after ${unlockAt} message${unlockAt === 1 ? '' : 's'}</span></div>
+      <div class="pf-text">${value}</div>
+    </div>`;
+  }
+
   drawer.innerHTML = `
     <div class="pf-hero" style="${avatarBg(p)}">
       <div class="pf-hero-back" onclick="closeProfile()">&#8592;</div>
@@ -1248,14 +1261,14 @@ function previewMyProfile(){
     </div>
     <div class="pf-full-body">
       <div style="background:var(--rose-soft); color:var(--rose); font-size:12px; font-weight:700; text-align:center; padding:10px 14px; border-radius:12px; margin-bottom:14px;">
-        &#128065; This is what other members see on your profile
+        &#128065; This is what other members see, and exactly when each part unlocks as you chat
       </div>
       <div class="verify-badges" style="margin-bottom:14px;">${verificationBadges(p)}</div>
-      ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
-      ${p.school ? `<div class="pf-section"><div class="pf-label">School / University</div><div class="pf-text">${p.school}</div></div>` : ''}
-      ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
-      ${p.dislikes ? `<div class="pf-section"><div class="pf-label">Dislikes</div><div class="pf-text">${p.dislikes}</div></div>` : ''}
-      ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
+      ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline <span style="text-transform:none; font-weight:600; color:var(--ink-soft);">— visible immediately</span></div><div class="pf-text">${p.tagline}</div></div>` : ''}
+      ${scheduleSection('Interests', p.interests, 2)}
+      ${scheduleSection('About', p.bio, 4)}
+      ${scheduleSection('School / University', p.school, 6)}
+      ${scheduleSection('Dislikes', p.dislikes, 8)}
       ${hasContent ? '' : `<div class="empty" style="margin-top:20px;">You haven't added an About, Interests, or Tagline yet — add some from Edit profile to help your matches get to know you.</div>`}
     </div>
   `;
@@ -1572,6 +1585,7 @@ async function openProfile(userId, conversationId){
     </div>
     <div class="pf-full-body">
       <div class="verify-badges" style="margin-bottom:14px;">${verificationBadges(p)}</div>
+      ${conversationId ? `<div class="info-cta-sub" style="text-align:left; margin-bottom:14px;">&#128172; ${messageCount} message${messageCount === 1 ? '' : 's'} exchanged — more unlocks as you keep chatting</div>` : ''}
       ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
       ${revealSection('Interests', p.interests, 2)}
       ${revealSection('About', p.bio, 4)}
