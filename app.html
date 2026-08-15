@@ -350,6 +350,7 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
   <div class="panel" id="panel-info"></div>
   <div class="panel" id="panel-admin"></div>
   <div class="panel" id="panel-chat" style="padding:0; display:none; flex-direction:column;"></div>
+  <div class="panel" id="panel-quiz" style="padding:0; display:none; flex-direction:column;"></div>
 
   <div class="profile-full" id="profileDrawer"></div>
 
@@ -393,7 +394,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-19';
+const BUILD_VERSION = 'build 2026-08-14-20';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -402,6 +403,10 @@ let currentProfile = null;
 let activeConversation = null;
 let messageChannel = null;
 let isPasswordRecovery = false;
+let quizChannel = null;
+let currentQuizSessionId = null;
+let currentQuizOtherId = null;
+let currentQuizOtherName = null;
 
 function initials(name){ return (name||'?')[0].toUpperCase(); }
 function avatarBg(p){
@@ -1024,6 +1029,8 @@ function switchTab(tab){
   document.getElementById('panel-info').classList.toggle('active', tab === 'info');
   document.getElementById('panel-admin').classList.toggle('active', tab === 'admin');
   document.getElementById('panel-chat').style.display = 'none';
+  document.getElementById('panel-quiz').style.display = 'none';
+  if(quizChannel){ sb.removeChannel(quizChannel); quizChannel = null; }
   if(tab === 'today') loadToday();
   if(tab === 'chats') loadChats();
   if(tab === 'info') renderInfoTab();
@@ -1695,6 +1702,8 @@ async function openChat(conversationId, otherId){
   chatPanel.style.display = 'flex';
 
   const { data: other } = await sb.from('profiles').select('*').eq('id', otherId).single();
+  const { data: convo } = await sb.from('conversations').select('message_count').eq('id', conversationId).single();
+  const quizUnlocked = convo && convo.message_count >= 10;
 
   chatPanel.innerHTML = `
     <div class="chat-header">
@@ -1703,6 +1712,7 @@ async function openChat(conversationId, otherId){
       <div class="person-name">${other.name}</div>
       <div class="view-profile-link" onclick="openProfile('${other.id}', '${conversationId}')">View Profile</div>
     </div>
+    ${quizUnlocked ? `<div class="reset-timer" style="margin:10px 16px 0; cursor:pointer;" onclick="openQuiz('${conversationId}', '${otherId}', '${(other.name||'').replace(/'/g,"\\'")}')">&#127919; Take the Compatibility Quiz together</div>` : ''}
     <div class="messages" id="msgList"></div>
     <div class="input-row">
       <textarea id="msgInput" placeholder="Message ${other.name}..." rows="1"></textarea>
@@ -1723,6 +1733,164 @@ async function openChat(conversationId, otherId){
 
   await loadMessages(conversationId);
   subscribeToMessages(conversationId);
+}
+
+// ---------- COMPATIBILITY QUIZ (live, synced between both matched users) ----------
+const QUIZ_QUESTIONS = [
+  { q: "How do you like to spend a weekend?", options: ["Adventure outdoors", "Cozy at home", "Out with friends", "Trying new restaurants"] },
+  { q: "Morning person or night owl?", options: ["Morning person", "Night owl", "Depends on the day"] },
+  { q: "How important is fitness in your life?", options: ["Very important", "Somewhat", "Not really"] },
+  { q: "Do you want kids someday?", options: ["Yes", "No", "Not sure yet", "Already have them"] },
+  { q: "Pineapple on pizza?", options: ["Yes", "Absolutely not", "Never tried it"] },
+];
+
+async function openQuiz(conversationId, otherId, otherName){
+  currentQuizOtherId = otherId;
+  currentQuizOtherName = otherName;
+
+  document.getElementById('panel-chat').style.display = 'none';
+  const quizPanel = document.getElementById('panel-quiz');
+  quizPanel.style.display = 'flex';
+  quizPanel.innerHTML = `<div class="empty" style="margin-top:60px;">Loading quiz...</div>`;
+
+  // find or create the shared session for this conversation
+  let { data: session } = await sb.from('quiz_sessions').select('*').eq('conversation_id', conversationId).maybeSingle();
+  if(!session){
+    const { data: newSession, error } = await sb.from('quiz_sessions')
+      .insert({ conversation_id: conversationId })
+      .select().single();
+    if(error){ quizPanel.innerHTML = `<div class="empty">${error.message}</div>`; return; }
+    session = newSession;
+  }
+  currentQuizSessionId = session.id;
+
+  // join as a participant — harmless if already joined
+  await sb.from('quiz_participants').upsert(
+    { session_id: session.id, user_id: currentUser.id },
+    { onConflict: 'session_id,user_id' }
+  );
+
+  subscribeToQuiz(session.id);
+  await renderQuizState();
+}
+
+function subscribeToQuiz(sessionId){
+  if(quizChannel) sb.removeChannel(quizChannel);
+  quizChannel = sb.channel('quiz-' + sessionId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_sessions', filter: `id=eq.${sessionId}` }, () => renderQuizState())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_participants', filter: `session_id=eq.${sessionId}` }, () => renderQuizState())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_answers', filter: `session_id=eq.${sessionId}` }, () => renderQuizState())
+    .subscribe();
+}
+
+function quizHeaderHtml(){
+  return `<div class="chat-header">
+    <div class="back" onclick="closeQuiz()">&#8592;</div>
+    <div class="person-name">Compatibility Quiz</div>
+  </div>`;
+}
+
+async function renderQuizState(){
+  const panel = document.getElementById('panel-quiz');
+  const { data: session } = await sb.from('quiz_sessions').select('*').eq('id', currentQuizSessionId).single();
+  const { data: participants } = await sb.from('quiz_participants').select('*').eq('session_id', currentQuizSessionId);
+  const bothJoined = participants && participants.length >= 2;
+
+  if(session.status === 'waiting' || !bothJoined){
+    panel.innerHTML = `
+      ${quizHeaderHtml()}
+      <div class="empty" style="margin-top:60px; padding:0 24px;">
+        &#8987; Waiting for ${currentQuizOtherName} to join...
+        <div class="info-cta-sub" style="margin-top:10px;">You'll both see the first question the moment they're in — no need to refresh.</div>
+      </div>`;
+    return;
+  }
+
+  if(session.status === 'completed' || session.current_question >= QUIZ_QUESTIONS.length){
+    return renderQuizResults();
+  }
+
+  const qIndex = session.current_question;
+  const question = QUIZ_QUESTIONS[qIndex];
+
+  const { data: myAnswer } = await sb.from('quiz_answers').select('*')
+    .eq('session_id', currentQuizSessionId).eq('user_id', currentUser.id).eq('question_index', qIndex).maybeSingle();
+
+  if(myAnswer){
+    panel.innerHTML = `
+      ${quizHeaderHtml()}
+      <div style="padding:20px; overflow-y:auto;">
+        <div class="info-cta-sub" style="margin-bottom:14px;">Question ${qIndex + 1} of ${QUIZ_QUESTIONS.length}</div>
+        <div class="today-card" style="padding:20px;">
+          <div style="font-weight:700; font-size:15px; margin-bottom:16px;">${question.q}</div>
+          <div class="v-badge on" style="padding:8px 14px;">You answered: ${myAnswer.answer}</div>
+        </div>
+        <div class="empty" style="margin-top:30px;">&#8987; Waiting for ${currentQuizOtherName} to answer...</div>
+      </div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    ${quizHeaderHtml()}
+    <div style="padding:20px; overflow-y:auto;">
+      <div class="info-cta-sub" style="margin-bottom:14px;">Question ${qIndex + 1} of ${QUIZ_QUESTIONS.length}</div>
+      <div class="today-card" style="padding:20px;">
+        <div style="font-weight:700; font-size:15px; margin-bottom:16px;">${question.q}</div>
+        ${question.options.map(opt => `<button class="btn btn-ghost" style="margin-top:8px; display:block; width:100%;" onclick="submitQuizAnswer(${qIndex}, '${opt.replace(/'/g,"\\'")}')">${opt}</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+async function submitQuizAnswer(questionIndex, answer){
+  const { error } = await sb.from('quiz_answers').insert({
+    session_id: currentQuizSessionId,
+    user_id: currentUser.id,
+    question_index: questionIndex,
+    answer
+  });
+  if(error){ alert(error.message); return; }
+  await renderQuizState();
+}
+
+async function renderQuizResults(){
+  const panel = document.getElementById('panel-quiz');
+  const { data: allAnswers } = await sb.from('quiz_answers').select('*').eq('session_id', currentQuizSessionId);
+
+  let matchCount = 0;
+  const rows = QUIZ_QUESTIONS.map((q, i) => {
+    const mine = allAnswers.find(a => a.user_id === currentUser.id && a.question_index === i);
+    const theirs = allAnswers.find(a => a.user_id === currentQuizOtherId && a.question_index === i);
+    const isMatch = !!(mine && theirs && mine.answer === theirs.answer);
+    if(isMatch) matchCount++;
+    return `
+      <div class="info-card" style="align-items:flex-start;">
+        <div style="flex:1;">
+          <div class="info-card-title">${q.q}</div>
+          <div class="verify-badges" style="margin-top:6px;">
+            <span class="v-badge ${isMatch ? 'on' : ''}">You: ${mine ? mine.answer : '—'}</span>
+            <span class="v-badge ${isMatch ? 'on' : ''}">${currentQuizOtherName}: ${theirs ? theirs.answer : '—'}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const pct = Math.round((matchCount / QUIZ_QUESTIONS.length) * 100);
+
+  panel.innerHTML = `
+    ${quizHeaderHtml()}
+    <div style="padding:20px; overflow-y:auto;">
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:40px; font-weight:800; color:var(--rose);">${pct}%</div>
+        <div class="info-cta-sub">You matched on ${matchCount} of ${QUIZ_QUESTIONS.length} questions</div>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function closeQuiz(){
+  if(quizChannel){ sb.removeChannel(quizChannel); quizChannel = null; }
+  document.getElementById('panel-quiz').style.display = 'none';
+  switchTab('chats');
 }
 
 async function loadMessages(conversationId){
