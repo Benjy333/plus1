@@ -259,8 +259,12 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
         <input type="text" id="suburbInput" placeholder="New Farm">
         <label>Profession</label>
         <input type="text" id="professionInput" placeholder="Photographer">
+        <label>School / University</label>
+        <input type="text" id="schoolInput" placeholder="UQ, QUT, Griffith...">
         <label>A few interests</label>
         <input type="text" id="interestsInput" placeholder="Hiking, film photography, vinyl">
+        <label>Dislikes</label>
+        <input type="text" id="dislikesInput" placeholder="Small talk, pineapple on pizza...">
         <div style="font-size:11px; color:var(--ink-soft); margin-top:10px; line-height:1.4;">Trust builds in 3 steps: <b>email</b>, <b>ID</b>, and <b>in-person</b> verification at a Plus 1 meetup. You'll start with none checked off.</div>
       </div>
       <label>Email</label>
@@ -374,7 +378,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-08';
+const BUILD_VERSION = 'build 2026-08-14-10';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -411,7 +415,9 @@ document.getElementById('authBtn').onclick = async () => {
   const gender = document.getElementById('genderInput').value;
   const suburb = document.getElementById('suburbInput').value.trim();
   const profession = document.getElementById('professionInput').value.trim();
+  const school = document.getElementById('schoolInput').value.trim();
   const interests = document.getElementById('interestsInput').value.trim();
+  const dislikes = document.getElementById('dislikesInput').value.trim();
   const errBox = document.getElementById('authErr');
   errBox.style.display = 'none';
   errBox.style.color = 'var(--rose)';
@@ -440,7 +446,7 @@ document.getElementById('authBtn').onclick = async () => {
       // fill in the bio fields on the auto-created profile row
       await sb.from('profiles').update({
         age: age ? parseInt(age) : null,
-        gender, suburb, profession, interests,
+        gender, suburb, profession, school, interests, dislikes,
         email_verified: false, id_verified: false, meetup_verified: false, approved: false
       }).eq('id', data.user.id);
       await onLoggedIn();
@@ -1206,7 +1212,9 @@ async function renderProfileTab(){
     <div id="avatarErr" class="err" style="display:none;"></div>
     <div class="verify-badges" style="margin-bottom:10px;">${verificationBadges(p)}</div>
     ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
+    ${p.school ? `<div class="pf-section"><div class="pf-label">School / University</div><div class="pf-text">${p.school}</div></div>` : ''}
     ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
+    ${p.dislikes ? `<div class="pf-section"><div class="pf-label">Dislikes</div><div class="pf-text">${p.dislikes}</div></div>` : ''}
     ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
     <div class="photo-upload-label" style="display:block; margin-top:14px;" onclick="showEditProfile()">Edit profile</div>
     <div class="photo-upload-label" style="display:block; margin-top:6px;" onclick="previewMyProfile()">&#128065; Preview as others see you</div>
@@ -1219,7 +1227,7 @@ function previewMyProfile(){
   const p = currentProfile;
   const genderLabel = p.gender ? (p.gender.toLowerCase()==='male'?'Male':p.gender.toLowerCase()==='female'?'Female':p.gender) : null;
   const drawer = document.getElementById('profileDrawer');
-  const hasContent = p.bio || p.interests || p.tagline;
+  const hasContent = p.bio || p.school || p.interests || p.dislikes || p.tagline;
   drawer.innerHTML = `
     <div class="pf-hero" style="${avatarBg(p)}">
       <div class="pf-hero-back" onclick="closeProfile()">&#8592;</div>
@@ -1235,7 +1243,9 @@ function previewMyProfile(){
       </div>
       <div class="verify-badges" style="margin-bottom:14px;">${verificationBadges(p)}</div>
       ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
+      ${p.school ? `<div class="pf-section"><div class="pf-label">School / University</div><div class="pf-text">${p.school}</div></div>` : ''}
       ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
+      ${p.dislikes ? `<div class="pf-section"><div class="pf-label">Dislikes</div><div class="pf-text">${p.dislikes}</div></div>` : ''}
       ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
       ${hasContent ? '' : `<div class="empty" style="margin-top:20px;">You haven't added an About, Interests, or Tagline yet — add some from Edit profile to help your matches get to know you.</div>`}
     </div>
@@ -1263,8 +1273,12 @@ function showEditProfile(){
       <input type="text" id="editSuburb" value="${p.suburb || ''}">
       <label>Profession</label>
       <input type="text" id="editProfession" value="${p.profession || ''}">
+      <label>School / University</label>
+      <input type="text" id="editSchool" value="${p.school || ''}" placeholder="UQ, QUT, Griffith...">
       <label>Interests</label>
       <input type="text" id="editInterests" value="${p.interests || ''}">
+      <label>Dislikes</label>
+      <input type="text" id="editDislikes" value="${p.dislikes || ''}" placeholder="Small talk, pineapple on pizza...">
       <label>About</label>
       <input type="text" id="editBio" value="${p.bio || ''}">
       <div class="err" id="editProfileErr" style="display:none;"></div>
@@ -1286,7 +1300,9 @@ async function saveEditProfile(){
   const name = document.getElementById('editName').value.trim();
   const suburb = document.getElementById('editSuburb').value.trim();
   const profession = document.getElementById('editProfession').value.trim();
+  const school = document.getElementById('editSchool').value.trim();
   const interests = document.getElementById('editInterests').value.trim();
+  const dislikes = document.getElementById('editDislikes').value.trim();
   const bio = document.getElementById('editBio').value.trim();
 
   if(!name || !suburb){
@@ -1297,7 +1313,7 @@ async function saveEditProfile(){
 
   // age and gender are intentionally excluded — locked after sign-up
   const { error } = await sb.from('profiles').update({
-    name, suburb, profession, interests, bio
+    name, suburb, profession, school, interests, dislikes, bio
   }).eq('id', currentUser.id);
 
   if(error){
@@ -1528,7 +1544,9 @@ async function openProfile(userId, conversationId){
     <div class="pf-full-body">
       <div class="verify-badges" style="margin-bottom:14px;">${verificationBadges(p)}</div>
       ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
+      ${p.school ? `<div class="pf-section"><div class="pf-label">School / University</div><div class="pf-text">${p.school}</div></div>` : ''}
       ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
+      ${p.dislikes ? `<div class="pf-section"><div class="pf-label">Dislikes</div><div class="pf-text">${p.dislikes}</div></div>` : ''}
       ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
       <div class="report-link" onclick="openReportModal('${p.id}', '${safeName}')">&#9873; Report ${p.name}</div>
       ${conversationId ? `<div class="report-link" style="color:var(--rose);" onclick="unmatchConversation('${conversationId}')">&#128683; Unmatch</div>` : ''}
