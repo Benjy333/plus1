@@ -252,7 +252,14 @@ textarea.report-desc{ width:100%; border:1.5px solid var(--border); border-radiu
     <h2 id="authTitle">Log in</h2>
     <div id="loginSignupFields">
       <div id="nameField" style="display:none;">
-        <label>Your name</label>
+        <label>Your photo</label>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+          <div id="signupAvatarPreview" style="width:56px; height:56px; border-radius:50%; background:var(--paper); border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; font-size:20px;">&#128247;</div>
+          <div class="photo-upload-label" onclick="document.getElementById('signupAvatarInput').click()">Choose a photo</div>
+          <input type="file" id="signupAvatarInput" accept="image/*" style="display:none;" onchange="handleSignupAvatarSelect(event)">
+        </div>
+        <div style="font-size:11px; color:var(--ink-soft); margin-top:6px; line-height:1.4;">Required. No sunglasses, and just you — no friends in the shot.</div>
+        <label style="margin-top:16px;">Your name</label>
         <input type="text" id="nameInput" placeholder="Jordan">
         <label>Age</label>
         <input type="number" id="ageInput" placeholder="29" min="25" max="35">
@@ -386,7 +393,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-16';
+const BUILD_VERSION = 'build 2026-08-14-18';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -430,9 +437,9 @@ document.getElementById('authBtn').onclick = async () => {
   errBox.style.display = 'none';
   errBox.style.color = 'var(--rose)';
 
-  if(!email || !password || (mode==='signup' && (!name || !age || !gender || !suburb))){
+  if(!email || !password || (mode==='signup' && (!name || !age || !gender || !suburb || !selectedSignupAvatarFile))){
     errBox.textContent = mode === 'signup'
-      ? 'Please fill in name, age, gender, and suburb at least.'
+      ? 'Please add a photo, and fill in name, age, gender, and suburb at least.'
       : 'Please fill in every field.';
     errBox.style.display = 'block';
     return;
@@ -457,6 +464,9 @@ document.getElementById('authBtn').onclick = async () => {
         gender, suburb, profession, school, interests, dislikes,
         email_verified: false, id_verified: false, meetup_verified: false, approved: false
       }).eq('id', data.user.id);
+      if(selectedSignupAvatarFile){
+        await uploadAvatarForUser(data.user.id, selectedSignupAvatarFile);
+      }
       await onLoggedIn();
     }
     else { errBox.style.color = 'var(--ink)'; errBox.textContent = 'Check your email to confirm your account, then log in.'; errBox.style.display='block'; }
@@ -1347,33 +1357,57 @@ async function saveEditProfile(){
   renderProfileTab();
 }
 
+// Reusable so both the signup flow (before onLoggedIn/currentUser exist) and
+// the My Profile "change photo" flow can share the same upload logic.
+async function uploadAvatarForUser(userId, file){
+  const ext = file.name.split('.').pop();
+  const path = `${userId}/avatar.${ext}`;
+
+  const { error: uploadError } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+  if(uploadError) return { error: uploadError };
+
+  const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
+  // cache-bust so the new photo shows immediately even though the URL path is the same
+  const freshUrl = urlData.publicUrl + '?t=' + Date.now();
+
+  const { error: updateError } = await sb.from('profiles').update({ avatar_url: freshUrl }).eq('id', userId);
+  if(updateError) return { error: updateError };
+
+  return { error: null };
+}
+
 async function uploadAvatar(event){
   const file = event.target.files[0];
   if(!file) return;
   const errBox = document.getElementById('avatarErr');
   errBox.style.display = 'none';
 
-  const ext = file.name.split('.').pop();
-  const path = `${currentUser.id}/avatar.${ext}`;
-
-  const { error: uploadError } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
-  if(uploadError){
-    errBox.textContent = uploadError.message;
-    errBox.style.display = 'block';
-    return;
-  }
-
-  const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
-  // cache-bust so the new photo shows immediately even though the URL path is the same
-  const freshUrl = urlData.publicUrl + '?t=' + Date.now();
-
-  const { error: updateError } = await sb.from('profiles').update({ avatar_url: freshUrl }).eq('id', currentUser.id);
-  if(updateError){
-    errBox.textContent = updateError.message;
+  const { error } = await uploadAvatarForUser(currentUser.id, file);
+  if(error){
+    errBox.textContent = error.message;
     errBox.style.display = 'block';
     return;
   }
   renderProfileTab();
+}
+
+// ---------- SIGNUP PHOTO PICKER ----------
+let selectedSignupAvatarFile = null;
+
+function handleSignupAvatarSelect(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  selectedSignupAvatarFile = file;
+
+  const preview = document.getElementById('signupAvatarPreview');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    preview.innerHTML = '';
+    preview.style.backgroundImage = `url('${e.target.result}')`;
+    preview.style.backgroundSize = 'cover';
+    preview.style.backgroundPosition = 'center';
+  };
+  reader.readAsDataURL(file);
 }
 
 function renderInfoTab(){
