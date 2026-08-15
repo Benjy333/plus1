@@ -374,7 +374,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-07';
+const BUILD_VERSION = 'build 2026-08-14-08';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -1208,8 +1208,8 @@ async function renderProfileTab(){
     ${p.bio ? `<div class="pf-section"><div class="pf-label">About</div><div class="pf-text">${p.bio}</div></div>` : ''}
     ${p.interests ? `<div class="pf-section"><div class="pf-label">Interests</div><div class="pf-text">${p.interests}</div></div>` : ''}
     ${p.tagline ? `<div class="pf-section"><div class="pf-label">Tagline</div><div class="pf-text">${p.tagline}</div></div>` : ''}
-    <div class="photo-upload-label" style="margin-top:14px;" onclick="showEditProfile()">Edit profile</div>
-    <div class="photo-upload-label" style="margin-top:6px;" onclick="previewMyProfile()">&#128065; Preview as others see you</div>
+    <div class="photo-upload-label" style="display:block; margin-top:14px;" onclick="showEditProfile()">Edit profile</div>
+    <div class="photo-upload-label" style="display:block; margin-top:6px;" onclick="previewMyProfile()">&#128065; Preview as others see you</div>
     <div id="editProfileForm"></div>
     <div class="info-cta-sub" style="margin-top:16px;">This is what other people see about you.</div>`;
 }
