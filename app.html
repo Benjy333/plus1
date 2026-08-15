@@ -393,7 +393,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-18';
+const BUILD_VERSION = 'build 2026-08-14-19';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -985,16 +985,32 @@ async function loadChats(){
   const { data: profiles } = await sb.from('profiles').select('*').in('id', otherIds);
   const profileMap = Object.fromEntries((profiles||[]).map(p => [p.id, p]));
 
+  // conversations are capped at 3 at a time, so fetching each one's latest
+  // message individually is simple and cheap — no schema changes needed.
+  const latestResults = await Promise.all(convos.map(c =>
+    sb.from('messages')
+      .select('body, sender_id')
+      .eq('conversation_id', c.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ));
+  const latestMessageMap = Object.fromEntries(convos.map((c, i) => [c.id, latestResults[i].data]));
+
   panel.innerHTML = convos.map(c => {
     const otherId = c.user_a === currentUser.id ? c.user_b : c.user_a;
     const p = profileMap[otherId] || { name: 'Unknown' };
     const waiting = c.last_sender_id && c.last_sender_id !== currentUser.id;
+    const lastMsg = latestMessageMap[c.id];
+    const preview = lastMsg
+      ? (lastMsg.sender_id === currentUser.id ? 'You: ' : '') + lastMsg.body
+      : 'Say hello 👋';
     return `
       <div class="person-card ${waiting ? 'waiting' : ''}" onclick="openChat('${c.id}','${otherId}')">
         <div class="avatar" style="${avatarBg(p)}">${p.avatar_url ? '' : initials(p.name)}</div>
-        <div style="flex:1;">
+        <div style="flex:1; min-width:0;">
           <div class="person-name">${p.name} ${waiting ? '<span class="waiting-badge">New</span>' : ''}</div>
-          <div class="person-sub">${c.message_count} messages</div>
+          <div class="person-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(preview)}</div>
         </div>
       </div>`;
   }).join('');
