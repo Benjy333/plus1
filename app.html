@@ -394,7 +394,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-20';
+const BUILD_VERSION = 'build 2026-08-14-21';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -1736,13 +1736,34 @@ async function openChat(conversationId, otherId){
 }
 
 // ---------- COMPATIBILITY QUIZ (live, synced between both matched users) ----------
-const QUIZ_QUESTIONS = [
+// Regular rotating pool — 4 are randomly picked per session.
+const QUIZ_QUESTION_POOL = [
   { q: "How do you like to spend a weekend?", options: ["Adventure outdoors", "Cozy at home", "Out with friends", "Trying new restaurants"] },
   { q: "Morning person or night owl?", options: ["Morning person", "Night owl", "Depends on the day"] },
   { q: "How important is fitness in your life?", options: ["Very important", "Somewhat", "Not really"] },
   { q: "Do you want kids someday?", options: ["Yes", "No", "Not sure yet", "Already have them"] },
   { q: "Pineapple on pizza?", options: ["Yes", "Absolutely not", "Never tried it"] },
+  { q: "Do you like to wear ankle socks?", options: ["Yes", "No"] },
+  { q: "Do you ever wake up before 6am?", options: ["Yes", "No"] },
+  { q: "Where would you like to travel to?", options: ["NYC", "Bali", "Australia", "Europe"] },
+  { q: "Do you prefer to be too hot or too cold?", options: ["Too hot", "Too cold"] },
+  { q: "What do you like to eat?", options: ["Pizza", "Burger", "Ramen", "Pad Thai"] },
+  { q: "What would you rather do?", options: ["Hike", "Movies", "Bar", "Sports game"] },
 ];
+
+// Always the 5th and final question — whoever answers it first sets the actual
+// first-date plan, shown as a suggestion on the results screen rather than
+// compared for a match like the others.
+const QUIZ_DATE_QUESTION = { q: "What's a good first date?", options: ["Drinks", "Coffee", "Walk", "Restaurant"] };
+
+function shuffleArray(arr){
+  const a = [...arr];
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 async function openQuiz(conversationId, otherId, otherName){
   currentQuizOtherId = otherId;
@@ -1753,11 +1774,14 @@ async function openQuiz(conversationId, otherId, otherName){
   quizPanel.style.display = 'flex';
   quizPanel.innerHTML = `<div class="empty" style="margin-top:60px;">Loading quiz...</div>`;
 
-  // find or create the shared session for this conversation
+  // find or create the shared session for this conversation. The question
+  // set is picked once, here, and stored on the session — so whoever creates
+  // it "locks in" the same 5 questions for both people, keeping them in sync.
   let { data: session } = await sb.from('quiz_sessions').select('*').eq('conversation_id', conversationId).maybeSingle();
   if(!session){
+    const questionSet = [...shuffleArray(QUIZ_QUESTION_POOL).slice(0, 4), QUIZ_DATE_QUESTION];
     const { data: newSession, error } = await sb.from('quiz_sessions')
-      .insert({ conversation_id: conversationId })
+      .insert({ conversation_id: conversationId, question_set: questionSet })
       .select().single();
     if(error){ quizPanel.innerHTML = `<div class="empty">${error.message}</div>`; return; }
     session = newSession;
@@ -1795,6 +1819,7 @@ async function renderQuizState(){
   const { data: session } = await sb.from('quiz_sessions').select('*').eq('id', currentQuizSessionId).single();
   const { data: participants } = await sb.from('quiz_participants').select('*').eq('session_id', currentQuizSessionId);
   const bothJoined = participants && participants.length >= 2;
+  const questions = session.question_set || [];
 
   if(session.status === 'waiting' || !bothJoined){
     panel.innerHTML = `
@@ -1806,12 +1831,12 @@ async function renderQuizState(){
     return;
   }
 
-  if(session.status === 'completed' || session.current_question >= QUIZ_QUESTIONS.length){
-    return renderQuizResults();
+  if(session.status === 'completed' || session.current_question >= questions.length){
+    return renderQuizResults(questions);
   }
 
   const qIndex = session.current_question;
-  const question = QUIZ_QUESTIONS[qIndex];
+  const question = questions[qIndex];
 
   const { data: myAnswer } = await sb.from('quiz_answers').select('*')
     .eq('session_id', currentQuizSessionId).eq('user_id', currentUser.id).eq('question_index', qIndex).maybeSingle();
@@ -1820,7 +1845,7 @@ async function renderQuizState(){
     panel.innerHTML = `
       ${quizHeaderHtml()}
       <div style="padding:20px; overflow-y:auto;">
-        <div class="info-cta-sub" style="margin-bottom:14px;">Question ${qIndex + 1} of ${QUIZ_QUESTIONS.length}</div>
+        <div class="info-cta-sub" style="margin-bottom:14px;">Question ${qIndex + 1} of ${questions.length}</div>
         <div class="today-card" style="padding:20px;">
           <div style="font-weight:700; font-size:15px; margin-bottom:16px;">${question.q}</div>
           <div class="v-badge on" style="padding:8px 14px;">You answered: ${myAnswer.answer}</div>
@@ -1833,7 +1858,7 @@ async function renderQuizState(){
   panel.innerHTML = `
     ${quizHeaderHtml()}
     <div style="padding:20px; overflow-y:auto;">
-      <div class="info-cta-sub" style="margin-bottom:14px;">Question ${qIndex + 1} of ${QUIZ_QUESTIONS.length}</div>
+      <div class="info-cta-sub" style="margin-bottom:14px;">Question ${qIndex + 1} of ${questions.length}</div>
       <div class="today-card" style="padding:20px;">
         <div style="font-weight:700; font-size:15px; margin-bottom:16px;">${question.q}</div>
         ${question.options.map(opt => `<button class="btn btn-ghost" style="margin-top:8px; display:block; width:100%;" onclick="submitQuizAnswer(${qIndex}, '${opt.replace(/'/g,"\\'")}')">${opt}</button>`).join('')}
@@ -1852,14 +1877,36 @@ async function submitQuizAnswer(questionIndex, answer){
   await renderQuizState();
 }
 
-async function renderQuizResults(){
+async function renderQuizResults(questions){
+  if(!questions){
+    const { data: session } = await sb.from('quiz_sessions').select('question_set').eq('id', currentQuizSessionId).single();
+    questions = (session && session.question_set) || [];
+  }
   const panel = document.getElementById('panel-quiz');
   const { data: allAnswers } = await sb.from('quiz_answers').select('*').eq('session_id', currentQuizSessionId);
 
   let matchCount = 0;
-  const rows = QUIZ_QUESTIONS.map((q, i) => {
+  const comparableCount = Math.max(questions.length - 1, 0); // the last (date) question isn't scored as a match
+
+  const rows = questions.map((q, i) => {
     const mine = allAnswers.find(a => a.user_id === currentUser.id && a.question_index === i);
     const theirs = allAnswers.find(a => a.user_id === currentQuizOtherId && a.question_index === i);
+    const isLast = i === questions.length - 1;
+
+    if(isLast){
+      // whoever answered first sets the actual first-date plan
+      const both = [mine, theirs].filter(Boolean).sort((a, b) => new Date(a.answered_at) - new Date(b.answered_at));
+      const first = both[0];
+      const suggestedBy = first ? (first.user_id === currentUser.id ? 'You' : currentQuizOtherName) : null;
+      return `
+        <div class="info-card" style="align-items:flex-start; background:var(--rose-soft);">
+          <div style="flex:1;">
+            <div class="info-card-title">&#127919; First date idea</div>
+            <div class="info-card-text" style="margin-top:4px;">${first ? `${suggestedBy} called it first: <b>${first.answer}</b>` : '—'}</div>
+          </div>
+        </div>`;
+    }
+
     const isMatch = !!(mine && theirs && mine.answer === theirs.answer);
     if(isMatch) matchCount++;
     return `
@@ -1874,14 +1921,14 @@ async function renderQuizResults(){
       </div>`;
   }).join('');
 
-  const pct = Math.round((matchCount / QUIZ_QUESTIONS.length) * 100);
+  const pct = comparableCount > 0 ? Math.round((matchCount / comparableCount) * 100) : 0;
 
   panel.innerHTML = `
     ${quizHeaderHtml()}
     <div style="padding:20px; overflow-y:auto;">
       <div style="text-align:center; margin-bottom:20px;">
         <div style="font-size:40px; font-weight:800; color:var(--rose);">${pct}%</div>
-        <div class="info-cta-sub">You matched on ${matchCount} of ${QUIZ_QUESTIONS.length} questions</div>
+        <div class="info-cta-sub">You matched on ${matchCount} of ${comparableCount} questions</div>
       </div>
       ${rows}
     </div>`;
