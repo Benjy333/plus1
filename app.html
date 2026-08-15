@@ -386,7 +386,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // running the latest code, without checking GitHub or clearing caches blind.
 // (This script tag sits at the end of <body>, so the DOM is already parsed here —
 // no need to wait for DOMContentLoaded.)
-const BUILD_VERSION = 'build 2026-08-14-14';
+const BUILD_VERSION = 'build 2026-08-14-15';
 if(document.getElementById('buildVersionAuth')) document.getElementById('buildVersionAuth').textContent = BUILD_VERSION;
 if(document.getElementById('buildVersionWaiting')) document.getElementById('buildVersionWaiting').textContent = BUILD_VERSION;
 
@@ -1215,6 +1215,7 @@ async function renderProfileTab(){
         <div class="pf-name">${p.name}${p.age ? ', ' + p.age : ''}</div>
         <div class="pf-sub">${[genderLabel, p.profession, p.suburb].filter(Boolean).join(' · ') || ''}</div>
         <div class="photo-upload-label" onclick="document.getElementById('avatarUpload').click()">${p.avatar_url ? 'Change photo' : 'Add a photo'}</div>
+        ${p.avatar_url ? '' : `<div style="font-size:11px; color:var(--ink-soft); margin-top:3px; line-height:1.4;">No sunglasses, and just you — no friends in the shot.</div>`}
       </div>
     </div>
     <div id="avatarErr" class="err" style="display:none;"></div>
